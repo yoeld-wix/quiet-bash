@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.8.1-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.9.0-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
@@ -117,22 +117,28 @@ failure it still surfaces the last 40 lines inline, and small `git diff`/`show`/
 | **Go / Rust / Ruby / C:** `go test/build/install/vet/mod/get/run`, `cargo`, `bundle`, `gem install`, `rake`, `rspec`, `make`, `cmake`, `ninja` | same |
 | **Containers / CI:** `docker build`, `docker compose`/`docker-compose`, `bk`/`buildkite` | same |
 | `git diff` / `git show` / `git log` (without a limiting flag, pipe, or redirect) | ≤60 lines → shown inline. Larger → `--stat`/`--oneline` summary + log path. Failure → tail. |
-| **Large `*.json` reads** (`cat`/`bat`/`head`/`jq .` of a file > 25 KB) | Collapsed preview: repeated object/array shapes fold to `"N more of M, same shape"`, long strings truncated, + a `jq`/`grep` drill-in footer. File untouched on disk. |
+| **Large `*.json` / `*.yaml` reads** (`cat`/`bat`/`head`/`jq .`/`yq .` of a file > 25 KB) | Collapsed preview: repeated object/array shapes fold to `"N more of M, same shape"`, long strings truncated, + a `jq`/`yq` drill-in footer. File untouched on disk. |
 | everything else (`ls`, `cat`, `grep`, `git status`, `gh …`, …) | Passed through unchanged. |
 
 Already-bounded commands (those with `--stat`, `--oneline`, a pipe to
 `head`/`grep`/…, or a `>` redirect) are left alone, and the hook never
 double-wraps its own output or a follow-up read of a log file.
 
-### Reading large JSON
+### Reading large JSON & YAML
 
-`cat`-ing a big `package-lock.json`, `openapi.json`, or k8s bundle dumps tens of
-thousands of tokens the agent mostly skims. quiet-bash rewrites a large-`*.json`
-read into a **collapsed preview** — repeated object/array shapes fold to one
-sample plus `"N more of M, same shape"` (so keys aren't repeated hundreds of
-times), long strings truncate, and a footer prints the exact `jq`/`grep` to
-query the full file (which is untouched on disk). A real `package-lock.json` went
-from **~299,000 tokens → ~660** (−99.8%).
+`cat`-ing a big `package-lock.json`, `openapi.json`, `pnpm-lock.yaml`, or a k8s
+bundle dumps tens of thousands of tokens the agent mostly skims. quiet-bash
+rewrites a large `*.json`/`*.yaml` read into a **collapsed preview** — repeated
+object/array shapes fold to one sample plus `"N more of M, same shape"` (so keys
+aren't repeated hundreds of times), long strings truncate, and a footer prints
+the exact `jq`/`yq` to query the full file (untouched on disk). A real
+`package-lock.json` went from **~299,000 tokens → ~660** (−99.8%); a 50-doc k8s
+manifest bundle collapses to its first few docs + a count.
+
+YAML is converted to JSON with the first available of **`ruby` → `python3`+PyYAML
+→ `yq`** (Ruby ships `yaml`+`json` in its stdlib, so this works out of the box on
+macOS and most CI); if none is present, YAML passes through untouched. Multi-doc
+YAML becomes an array; comments are dropped in conversion (fine for a summary).
 
 The collapsed-preview format was chosen over gron-flat and schema-only by an
 A/B/C benchmark measuring **tokens *and* answer accuracy**: collapsed used the
@@ -143,7 +149,7 @@ by distinct names, so `package-lock.json` barely shrank.)
 
 Pass-through is deliberate: small files, `jq`/`yq` **projections** (you already
 narrowed it), and piped/redirected commands are never touched. Tune with
-`QUIET_JSON_MIN_BYTES` (default 25000). YAML support is planned (needs `yq`).
+`QUIET_JSON_MIN_BYTES` (default 25000).
 
 ## Supported agents
 

@@ -78,5 +78,25 @@ echo "$sout" | grep -q 'more of 3000' && pass "summary states total count" || ba
 echo "$sout" | grep -q 'quiet-json.sh' >/dev/null; echo "$sout" | grep -q 'jq ' && pass "summary has jq drill-in footer" || bad "summary missing footer"
 rm -rf "$JTMP"
 
+echo "== YAML read optimization =="
+if command -v ruby >/dev/null 2>&1 || command -v yq >/dev/null 2>&1 \
+   || { command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' 2>/dev/null; }; then
+  YT=$(mktemp -d)
+  bigy="$YT/big.yaml"; smally="$YT/small.yaml"
+  { echo "items:"; for i in $(seq 1 700); do printf -- '  - {id: %s, name: pkg, version: 1.0.0, url: "https://example.com/x"}\n' "$i"; done; } > "$bigy"
+  printf 'name: x\nversion: 1.0.0\n' > "$smally"
+  if quiet_rewrite "cat $bigy" | grep -q 'quiet-json.sh'; then pass "large cat *.yaml -> summarizer"; else bad "large yaml wrap"; fi
+  if quiet_rewrite "cat $smally" >/dev/null; then bad "small yaml should pass"; else pass "small yaml passes through"; fi
+  if quiet_rewrite "yq '.items[0]' $bigy" >/dev/null; then bad "yq projection should pass"; else pass "yq projection passes through"; fi
+  yout=$("$ROOT/core/quiet-json.sh" "$bigy")
+  echo "$yout" | grep -q 'YAML' && pass "yaml summary labeled YAML" || bad "yaml summary label"
+  echo "$yout" | grep -q 'more of 700' && pass "yaml summary states total count" || bad "yaml total count"
+  rawb=$(wc -c <"$bigy"|tr -d ' '); sumb=$(printf '%s' "$yout"|wc -c|tr -d ' ')
+  [ "$sumb" -lt "$((rawb/3))" ] && pass "yaml summary shrinks ($sumb vs $rawb)" || bad "yaml summary not small"
+  rm -rf "$YT"
+else
+  echo "  (skipped — no YAML converter: ruby / python3+PyYAML / yq)"
+fi
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

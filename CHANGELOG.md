@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.9.0] — 2026-06-21
+
+### Added
+- **YAML read optimization**: large `*.yaml`/`*.yml` reads get the same collapsed
+  preview as JSON. YAML→JSON conversion uses a fallback ladder — `ruby` →
+  `python3`+PyYAML → `yq` — so it works out of the box (Ruby's stdlib ships
+  yaml+json; present on macOS and CI) with **no hard dependency**; passes through
+  if no converter is available. Multi-doc YAML becomes an array. New YAML tests.
+
 ## [1.8.1] — 2026-06-21
 
 ### Changed

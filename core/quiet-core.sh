@@ -101,19 +101,27 @@ quiet_rewrite() {
     *__log=* | *"${QUIET_LOG_PREFIX}"* | *quiet-json.sh*) return 1 ;;
   esac
 
-  # ── JSON read optimization: summarize a large *.json dump ─────────────
-  # Only plain reads (cat/bat/less/more/head/tail or `jq .`) of a single large
-  # .json file — never a piped/redirected command or a jq projection (those
-  # already narrow the output, so leave them alone).
+  # ── JSON/YAML read optimization: summarize a large structured-data dump ──
+  # Only plain reads (cat/bat/less/more/head/tail or `jq .`/`yq .`) of a single
+  # large .json/.yaml/.yml file — never a piped/redirected command or a
+  # projection (those already narrow the output, so leave them alone). YAML is
+  # handled when a converter (ruby / python3 / yq) is present; else passes through.
   case "$cmd" in
-    *'|'* | *'>'*) : ;;  # piped/redirected → skip JSON path
+    *'|'* | *'>'*) : ;;  # piped/redirected → skip
     *)
       local jfile
-      jfile=$(printf '%s' "$cmd" | grep -oE '[^[:space:]]+\.json' | head -1)
+      jfile=$(printf '%s' "$cmd" | grep -oE '[^[:space:]]+\.(json|ya?ml)' | head -1)
       if [ -n "$jfile" ] && [ -f "$jfile" ] \
          && [ "$(wc -c <"$jfile" 2>/dev/null || echo 0)" -gt "${QUIET_JSON_MIN_BYTES}" ]; then
-        if printf '%s' "$cmd" | grep -qE '(^|[[:space:];&|(])(cat|bat|less|more|head|tail)[[:space:]]' \
-           || printf '%s' "$cmd" | grep -qE "(^|[[:space:];&|(])jq[[:space:]]+(-[A-Za-z]+[[:space:]]+)*('\\.'|\\.)([[:space:]]|\$)"; then
+        local ok=0
+        case "$jfile" in
+          *.json) ok=1 ;;
+          # YAML needs a converter — ruby (macOS default) / python3 / yq
+          *) { command -v ruby >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 || command -v yq >/dev/null 2>&1; } && ok=1 ;;
+        esac
+        if [ "$ok" = 1 ] \
+           && { printf '%s' "$cmd" | grep -qE '(^|[[:space:];&|(])(cat|bat|less|more|head|tail)[[:space:]]' \
+                || printf '%s' "$cmd" | grep -qE "(^|[[:space:];&|(])(jq|yq)[[:space:]]+(-[A-Za-z=]+[[:space:]]+)*('\\.'|\\.)([[:space:]]|\$)"; }; then
           printf '%q %q' "${QUIET_CORE_DIR}/quiet-json.sh" "$jfile"
           return 0
         fi
