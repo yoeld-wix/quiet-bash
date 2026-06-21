@@ -1,0 +1,13 @@
+{
+  "name": "claude-quiet-bash",
+  "owner": {
+    "name": "yoeld-wix"
+  },
+  "plugins": [
+    {
+      "name": "claude-quiet-bash",
+      "source": "./",
+      "description": "Quiets noisy Bash commands by redirecting full output to a temp log and surfacing only a summary, preserving failure details."
+    }
+  ]
+}
