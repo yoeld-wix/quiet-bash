@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="quiet-bash" width="440">
+  <img src="assets/logo.png" alt="quiet-bash" width="560">
 </p>
 
 <p align="center">
@@ -17,6 +17,8 @@
 <p align="center">
   <a href="#supported-agents">Works with Claude Code · Codex · Gemini · Copilot · Cursor · Aider · any shell</a> ·
   <a href="#how-much-it-saves">Savings</a> ·
+  <a href="docs/token-savings-research.md">Research</a> ·
+  <a href="docs/graph-options.md">Graph options</a> ·
   <a href="examples/before-after.md">Examples</a> ·
   <a href="LICENSE">MIT</a>
 </p>
@@ -52,7 +54,8 @@ more in extra round-trips than it would save.
 
 <sub>10-subagent benchmark on a real monorepo — 5 commands run live, 5 modeled
 from representative logs. Token estimate ≈ bytes ÷ 4. Methodology in
-[Benchmark](#benchmark).</sub>
+[Benchmark](#benchmark). Research notes in
+[Token savings research](docs/token-savings-research.md).</sub>
 
 ### Bottom line for an average dev
 

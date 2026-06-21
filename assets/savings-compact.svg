@@ -1,0 +1,41 @@
+<svg width="1010" height="360" viewBox="0 0 1010 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="quiet-bash benchmark summary: 536,957 raw command-output tokens become 250 summary tokens">
+  <style>
+    .mono { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; }
+    .title { font-size: 22px; font-weight: 700; }
+    .metric { font-size: 46px; font-weight: 800; }
+    .label { font-size: 14px; font-weight: 700; }
+    .small { font-size: 12px; }
+  </style>
+  <defs>
+    <linearGradient id="rawFill" x1="86" y1="0" x2="636" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f29a7f"/>
+      <stop offset="1" stop-color="#d85d52"/>
+    </linearGradient>
+    <linearGradient id="keptFill" x1="712" y1="0" x2="925" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#44d8aa"/>
+      <stop offset="1" stop-color="#1fb588"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1010" height="360" rx="8" fill="#fbfcfd"/>
+  <text x="32" y="42" class="mono title" fill="#202a35">Benchmark snapshot</text>
+  <text x="32" y="67" class="mono small" fill="#667085">10 verbose commands from a production monorepo: 5 measured live, 5 modeled from representative logs.</text>
+
+  <text x="86" y="118" class="mono label" fill="#7a3840">without quiet-bash</text>
+  <rect x="86" y="135" width="550" height="112" rx="8" fill="url(#rawFill)"/>
+  <text x="112" y="204" class="mono metric" fill="#ffffff">536,957</text>
+  <text x="116" y="229" class="mono small" fill="#fff0ec">raw command-output tokens</text>
+
+  <path d="M662 191H704" stroke="#8b949e" stroke-width="6" stroke-linecap="round"/>
+  <path d="M690 177L704 191L690 205" stroke="#8b949e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text x="712" y="118" class="mono label" fill="#146c5a">with quiet-bash</text>
+  <rect x="712" y="135" width="213" height="112" rx="8" fill="url(#keptFill)"/>
+  <text x="742" y="204" class="mono metric" fill="#ffffff">250</text>
+  <text x="746" y="229" class="mono small" fill="#eafff8">summary tokens kept</text>
+
+  <line x1="86" y1="286" x2="925" y2="286" stroke="#e7ebef" stroke-width="10" stroke-linecap="round"/>
+  <line x1="86" y1="286" x2="86.4" y2="286" stroke="#1fb588" stroke-width="10" stroke-linecap="round"/>
+  <text x="86" y="318" class="mono small" fill="#57606a">output retained</text>
+  <text x="925" y="318" text-anchor="end" class="mono small" fill="#57606a">99.953% removed before it reaches the model context</text>
+</svg>
