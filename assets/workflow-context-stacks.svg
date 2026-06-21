@@ -1,0 +1,65 @@
+<svg width="900" height="360" viewBox="0 0 900 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="quiet-bash estimated session savings by workflow">
+  <style>
+    .mono { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; }
+    .title { font-size: 22px; font-weight: 700; }
+    .name { font-size: 16px; font-weight: 700; }
+    .small { font-size: 12px; }
+    .pct { font-size: 18px; font-weight: 800; }
+  </style>
+  <defs>
+    <linearGradient id="logs" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#f29a7f"/>
+      <stop offset="1" stop-color="#d85d52"/>
+    </linearGradient>
+    <linearGradient id="saved" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#44d8aa"/>
+      <stop offset="1" stop-color="#1fb588"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="360" rx="8" fill="#fbfcfd"/>
+  <text x="32" y="42" class="mono title" fill="#202a35">Session savings depend on log density</text>
+  <text x="32" y="67" class="mono small" fill="#667085">quiet-bash removes nearly all verbose command output, so total savings track the share of context taken by logs.</text>
+
+  <g class="mono small">
+    <rect x="552" y="33" width="14" height="14" rx="3" fill="url(#logs)"/>
+    <text x="574" y="45" fill="#667085">command output before</text>
+    <rect x="720" y="33" width="14" height="14" rx="3" fill="url(#saved)"/>
+    <text x="742" y="45" fill="#667085">tokens saved</text>
+  </g>
+
+  <line x1="222" y1="95" x2="822" y2="95" stroke="#e7ebef"/>
+  <line x1="222" y1="95" x2="222" y2="282" stroke="#e7ebef"/>
+  <line x1="372" y1="95" x2="372" y2="282" stroke="#eef1f4"/>
+  <line x1="522" y1="95" x2="522" y2="282" stroke="#eef1f4"/>
+  <line x1="672" y1="95" x2="672" y2="282" stroke="#eef1f4"/>
+  <line x1="822" y1="95" x2="822" y2="282" stroke="#eef1f4"/>
+  <text x="222" y="88" text-anchor="middle" class="mono small" fill="#98a2b3">0%</text>
+  <text x="372" y="88" text-anchor="middle" class="mono small" fill="#98a2b3">25%</text>
+  <text x="522" y="88" text-anchor="middle" class="mono small" fill="#98a2b3">50%</text>
+  <text x="672" y="88" text-anchor="middle" class="mono small" fill="#98a2b3">75%</text>
+  <text x="822" y="88" text-anchor="middle" class="mono small" fill="#98a2b3">100%</text>
+
+  <text x="196" y="134" text-anchor="end" class="mono name" fill="#202a35">Light</text>
+  <text x="196" y="153" text-anchor="end" class="mono small" fill="#8b949e">mostly reading/editing</text>
+  <rect x="222" y="117" width="600" height="42" rx="6" fill="#edf1f5"/>
+  <rect x="222" y="117" width="108" height="42" rx="6" fill="url(#logs)"/>
+  <rect x="222" y="167" width="108" height="8" rx="4" fill="url(#saved)"/>
+  <text x="348" y="145" class="mono pct" fill="#1fb588">~18% saved</text>
+
+  <text x="196" y="207" text-anchor="end" class="mono name" fill="#202a35">Typical</text>
+  <text x="196" y="226" text-anchor="end" class="mono small" fill="#8b949e">test/build loops</text>
+  <rect x="222" y="190" width="600" height="42" rx="6" fill="#edf1f5"/>
+  <rect x="222" y="190" width="210" height="42" rx="6" fill="url(#logs)"/>
+  <rect x="222" y="240" width="210" height="8" rx="4" fill="url(#saved)"/>
+  <text x="450" y="218" class="mono pct" fill="#1fb588">~35% saved</text>
+
+  <text x="196" y="280" text-anchor="end" class="mono name" fill="#202a35">Heavy</text>
+  <text x="196" y="299" text-anchor="end" class="mono small" fill="#8b949e">TDD/CI debugging</text>
+  <rect x="222" y="263" width="600" height="42" rx="6" fill="#edf1f5"/>
+  <rect x="222" y="263" width="330" height="42" rx="6" fill="url(#logs)"/>
+  <rect x="222" y="313" width="330" height="8" rx="4" fill="url(#saved)"/>
+  <text x="570" y="291" class="mono pct" fill="#1fb588">~55% saved</text>
+
+  <text x="32" y="338" class="mono small" fill="#8b949e">Model: total saving ~= command-output share x 99.953%. Prompt caching discounts repeats; quiet-bash prevents logs entering context.</text>
+</svg>
