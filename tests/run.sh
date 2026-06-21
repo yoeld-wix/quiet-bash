@@ -57,5 +57,26 @@ out=$(timeout 10 yarn install </dev/null);        echo "$out" | grep -q '^\[ok' 
 out=$(timeout 10 yarn info x </dev/null);          echo "$out" | grep -q '^yarn info x' && pass "shim yarn info passes" || bad "shim yarn info pass"
 rm -rf "$TMP"
 
+echo "== JSON read optimization =="
+JTMP=$(mktemp -d)
+big="$JTMP/big.json"; small="$JTMP/small.json"
+jq -n '{name:"x", items:[range(3000)|{id:.,name:"pkg",version:"1.0.0",resolved:"https://example.com/x"}]}' > "$big"
+jq -n '{name:"x", version:"1.0.0"}' > "$small"
+# large plain read -> wrapped to the summarizer
+if quiet_rewrite "cat $big" | grep -q 'quiet-json.sh'; then pass "large cat *.json -> summarizer"; else bad "large cat *.json wrap"; fi
+# small json -> pass through
+if quiet_rewrite "cat $small" >/dev/null; then bad "small json should pass"; else pass "small json passes through"; fi
+# jq projection -> pass through (don't fight an explicit query)
+if quiet_rewrite "jq '.items[0]' $big" >/dev/null; then bad "jq projection should pass"; else pass "jq projection passes through"; fi
+# piped command -> pass through
+if quiet_rewrite "cat $big | jq ." >/dev/null; then bad "piped json should pass"; else pass "piped json passes through"; fi
+# summarizer actually shrinks + stays valid-ish + shows totals
+sout=$("$ROOT/core/quiet-json.sh" "$big")
+rawb=$(wc -c <"$big"|tr -d ' '); sumb=$(printf '%s' "$sout"|wc -c|tr -d ' ')
+[ "$sumb" -lt "$((rawb/10))" ] && pass "summary <10% of raw ($sumb vs $rawb)" || bad "summary not small enough"
+echo "$sout" | grep -q 'more of 3000' && pass "summary states total count" || bad "summary missing total count"
+echo "$sout" | grep -q 'quiet-json.sh' >/dev/null; echo "$sout" | grep -q 'jq ' && pass "summary has jq drill-in footer" || bad "summary missing footer"
+rm -rf "$JTMP"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

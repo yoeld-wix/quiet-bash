@@ -20,6 +20,10 @@
 : "${QUIET_INLINE_LINE_LIMIT:=60}"       # git output up to this many lines shown inline
 : "${QUIET_FAIL_TAIL_LINES:=40}"         # lines of a failed command's log to surface
 : "${QUIET_LOG_RETENTION_MINUTES:=1440}" # prune redirect logs older than this (24h)
+: "${QUIET_JSON_MIN_BYTES:=25000}"       # summarize *.json dumps larger than this
+
+# Absolute dir of this core (so quiet_rewrite can point at sibling scripts).
+QUIET_CORE_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || QUIET_CORE_DIR=.
 
 # ── Prune stale redirect logs ────────────────────────────────────────────────
 quiet_prune() {
@@ -94,7 +98,27 @@ quiet_rewrite() {
 
   # Never double-wrap, and never wrap a follow-up read of a redirect log.
   case "$cmd" in
-    *__log=* | *"${QUIET_LOG_PREFIX}"*) return 1 ;;
+    *__log=* | *"${QUIET_LOG_PREFIX}"* | *quiet-json.sh*) return 1 ;;
+  esac
+
+  # ── JSON read optimization: summarize a large *.json dump ─────────────
+  # Only plain reads (cat/bat/less/more/head/tail or `jq .`) of a single large
+  # .json file — never a piped/redirected command or a jq projection (those
+  # already narrow the output, so leave them alone).
+  case "$cmd" in
+    *'|'* | *'>'*) : ;;  # piped/redirected → skip JSON path
+    *)
+      local jfile
+      jfile=$(printf '%s' "$cmd" | grep -oE '[^[:space:]]+\.json' | head -1)
+      if [ -n "$jfile" ] && [ -f "$jfile" ] \
+         && [ "$(wc -c <"$jfile" 2>/dev/null || echo 0)" -gt "${QUIET_JSON_MIN_BYTES}" ]; then
+        if printf '%s' "$cmd" | grep -qE '(^|[[:space:];&|(])(cat|bat|less|more|head|tail)[[:space:]]' \
+           || printf '%s' "$cmd" | grep -qE "(^|[[:space:];&|(])jq[[:space:]]+(-[A-Za-z]+[[:space:]]+)*('\\.'|\\.)([[:space:]]|\$)"; then
+          printf '%q %q' "${QUIET_CORE_DIR}/quiet-json.sh" "$jfile"
+          return 0
+        fi
+      fi
+      ;;
   esac
 
   # ── git path: diff/show/log have unbounded output but CONTENT matters ──

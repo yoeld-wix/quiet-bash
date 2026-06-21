@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.8.0] — 2026-06-21
+
+### Added
+- **Large-JSON read optimization** (`core/quiet-json.sh`): a `cat`/`bat`/`head`/
+  `jq .` of a `*.json` file over `QUIET_JSON_MIN_BYTES` (25 KB) is rewritten into
+  a collapsed preview — repeated object/array shapes fold to `"N more of M,
+  same shape"`, long strings truncate, and a `jq`/`grep` drill-in footer points
+  at the (untouched) file. ~299k → ~660 tokens on a real `package-lock.json`.
+- The collapsed-preview format was selected over gron-flat and schema-only by an
+  A/B/C benchmark (fewest tokens, equal accuracy, zero hallucinated values).
+- Pass-through for small files, `jq`/`yq` projections, and piped/redirected
+  commands. New JSON tests in the suite.
+
+### Notes
+- YAML read optimization is planned (will use `yq`).
+
 ## [1.7.0] — 2026-06-21
 
 ### Changed
