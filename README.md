@@ -24,9 +24,13 @@ fully diagnosable.
 
 | Command shape | Behaviour |
 |---|---|
-| `yarn test/build/lint/install`, `npm test/ci/install/run …`, `npx jest/turbo/tsc`, `turbo run`, `jest`, `bk`/buildkite, `docker build`, `bazel build/test` | Success → one summary line, output hidden. Failure → last 40 lines + log path. |
+| **JS/TS:** `yarn`/`npm`/`pnpm`/`bun` (test/build/lint/install/add/ci/run/dev/start…), `npx …`, `jest`, `vitest`, `mocha`, `cypress`, `playwright`, `tsc`, `eslint`, `prettier`, `webpack`, `vite`, `rollup`, `esbuild`, `turbo`, `gulp`, `grunt` | Success → one summary line, output hidden. Failure → last 40 lines + log path. |
+| **Python:** `pip install`, `pipenv`, `poetry`, `uv`, `conda`, `python -m …`, `python setup.py`, `pytest`, `tox`, `nox` | same |
+| **JVM/Scala:** `gradle`/`gradlew`, `mvn`/`mvnw`/`maven`, `sbt`, `bloop`, `bazel`, `buildozer` | same |
+| **Go / Rust / Ruby / C:** `go test/build/install/vet/mod/get/run`, `cargo`, `bundle`, `gem install`, `rake`, `rspec`, `make`, `cmake`, `ninja` | same |
+| **Containers / CI:** `docker build`, `docker compose`/`docker-compose`, `bk`/`buildkite` | same |
 | `git diff` / `git show` / `git log` (without a limiting flag, pipe, or redirect) | ≤60 lines → shown inline. Larger → `--stat`/`--oneline` summary + log path. Failure → tail. |
-| everything else | Passed through unchanged. |
+| everything else (`ls`, `cat`, `grep`, `git status`, `gh …`, …) | Passed through unchanged. |
 
 Already-bounded commands (those with `--stat`, `--oneline`, a pipe to
 `head`/`grep`/…, or a `>` redirect) are left alone, and the hook never

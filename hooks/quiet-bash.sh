@@ -96,7 +96,25 @@ if printf '%s' "$cmd" | grep -qE "$GIT_RE" && ! printf '%s' "$cmd" | grep -qE "$
   emit "$(wrap_git "$cmd" "$summary")"
 fi
 
-# ── verbose-runner path: test/build/install/CI tooling ───────────────────────
-VERBOSE_RE='(^|[[:space:];&|(])(yarn([[:space:]]+workspace[[:space:]]+[^[:space:]]+)?[[:space:]]+(test|build|lint|install)|npm[[:space:]]+(test|ci|install|run[[:space:]]+(test|build|lint))|npx[[:space:]]+(jest|turbo|tsc)|turbo[[:space:]]+run|jest([[:space:]]|$)|bk[[:space:]]|docker[[:space:]]+build|bazel[[:space:]]+(build|test))|buildkite'
+# ── verbose-runner path: build / test / install / CI tooling across ecosystems ─
+# Composed from a few groups for readability; extend any of them to cover more.
+# Boundary before a tool token: line start, whitespace, shell operator, or a
+# path separator (so `./gradlew`, `./mvnw`, `/usr/bin/make` are recognised).
+PRE='(^|[[:space:];&|(/])'
+
+# Tools that are almost always verbose, whatever the subcommand.
+ALWAYS='(jest|vitest|mocha|cypress|playwright|pytest|tox|nox|cargo|gradle|gradlew|mvn|mvnw|maven|sbt|bloop|bazel|buildozer|buildkite|turbo|webpack|vite|rollup|esbuild|tsc|eslint|prettier|rspec|rake|ninja|gulp|grunt)([[:space:]]|$)'
+
+# Managers/tools that are verbose only for specific subcommands.
+MANAGED='(yarn|npm|pnpm|bun)([[:space:]]+(workspace|--filter|-w)[[:space:]]+[^[:space:]]+)*[[:space:]]+(test|build|lint|install|add|ci|run|dev|start|typecheck|watch)'
+MANAGED="${MANAGED}|npx[[:space:]]+[^[:space:]]+"
+MANAGED="${MANAGED}|pip[0-9.]*[[:space:]]+install|pipenv[[:space:]]+(install|run|sync)|poetry[[:space:]]+(install|build|run|update|lock)|uv[[:space:]]+(pip|sync|run|build|lock)|conda[[:space:]]+(install|env)|python[0-9.]*[[:space:]]+(-m|setup\.py)|tox([[:space:]]|$)"
+MANAGED="${MANAGED}|go[[:space:]]+(test|build|install|vet|mod|get|run)"
+MANAGED="${MANAGED}|make([[:space:]]|$)|cmake([[:space:]]|$)"
+MANAGED="${MANAGED}|docker[[:space:]]+(build|compose)|docker-compose[[:space:]]+(build|up)"
+MANAGED="${MANAGED}|bundle[[:space:]]+(install|exec|update)|gem[[:space:]]+install"
+MANAGED="${MANAGED}|bk([[:space:]]|$)|buildkite"
+
+VERBOSE_RE="${PRE}(${ALWAYS}|${MANAGED})"
 printf '%s' "$cmd" | grep -qE "$VERBOSE_RE" || exit 0
 emit "$(wrap_generic "$cmd")"
