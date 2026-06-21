@@ -44,6 +44,25 @@ more in extra round-trips than it would save.
 from representative logs. Token estimate ≈ bytes ÷ 4. Methodology in
 [Benchmark](#benchmark).</sub>
 
+### Bottom line for an average dev
+
+**≈ 30 % lower token cost on a typical session** — ranging from ~15–20 % for
+read/edit-heavy work to **50 %+** for build- and test-heavy workflows. The rule
+of thumb:
+
+> total saving ≈ (share of your context that is command output) × 99 %
+
+The **99.9 %** cut on command output is measured. The session-level percentage
+is a model — it depends on how log-heavy your work is, and prompt caching /
+context compaction move it around — so treat ~30 % as a representative midpoint,
+not a guarantee.
+
+| Your workflow | Command output ≈ | Total token cost saved |
+|---|--:|--:|
+| Light (mostly reading/editing) | ~15–20 % of context | **~15–20 %** |
+| Typical (regular test/build loops) | ~30–40 % | **~30 %** |
+| Heavy (TDD, CI-debugging, full builds) | ~50–60 % | **~50 %+** |
+
 ### Why it compounds over a session
 
 An LLM agent is **stateless**: on *every* turn the whole conversation so far —
