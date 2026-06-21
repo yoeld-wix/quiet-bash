@@ -47,8 +47,8 @@ case "$target" in
     cat <<EOF
 Claude Code — run these in the Claude Code prompt:
 
-    /plugin marketplace add yoeld-wix/claude-quiet-bash
-    /plugin install claude-quiet-bash@claude-quiet-bash
+    /plugin marketplace add yoeld-wix/quiet-bash
+    /plugin install quiet-bash@quiet-bash
 
 Then restart Claude Code.
 EOF

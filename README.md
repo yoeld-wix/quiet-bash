@@ -7,11 +7,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.6.0-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.7.0-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
-  <a href="https://github.com/yoeld-wix/claude-quiet-bash/actions/workflows/ci.yml"><img src="https://github.com/yoeld-wix/claude-quiet-bash/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
+  <a href="https://github.com/yoeld-wix/quiet-bash/actions/workflows/ci.yml"><img src="https://github.com/yoeld-wix/quiet-bash/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
 </p>
 
 <p align="center">
@@ -156,8 +156,8 @@ covered.
 This repo doubles as a single-plugin marketplace:
 
 ```
-/plugin marketplace add yoeld-wix/claude-quiet-bash
-/plugin install claude-quiet-bash@claude-quiet-bash
+/plugin marketplace add yoeld-wix/quiet-bash
+/plugin install quiet-bash@quiet-bash
 ```
 
 Restart Claude Code so the hook registers. To install manually instead, add a
@@ -168,7 +168,7 @@ Restart Claude Code so the hook registers. To install manually instead, add a
   "hooks": {
     "PreToolUse": [
       { "matcher": "Bash", "hooks": [
-        { "type": "command", "command": "/abs/path/to/claude-quiet-bash/adapters/claude-code.sh", "timeout": 10 }
+        { "type": "command", "command": "/abs/path/to/quiet-bash/adapters/claude-code.sh", "timeout": 10 }
       ] }
     ]
   }
@@ -178,7 +178,7 @@ Restart Claude Code so the hook registers. To install manually instead, add a
 ### OpenAI Codex CLI
 
 ```
-codex plugin marketplace add yoeld-wix/claude-quiet-bash
+codex plugin marketplace add yoeld-wix/quiet-bash
 ```
 
 Then register `adapters/codex.sh` as a `PreToolUse` hook in `~/.codex/hooks.json`
@@ -187,7 +187,7 @@ Then register `adapters/codex.sh` as a `PreToolUse` hook in `~/.codex/hooks.json
 ### Gemini CLI
 
 ```
-gemini extensions install https://github.com/yoeld-wix/claude-quiet-bash
+gemini extensions install https://github.com/yoeld-wix/quiet-bash
 ```
 
 Then add a `BeforeTool` hook in `settings.json` with
@@ -197,7 +197,7 @@ Then add a `BeforeTool` hook in `settings.json` with
 ### GitHub Copilot CLI
 
 ```
-copilot plugin marketplace add yoeld-wix/claude-quiet-bash
+copilot plugin marketplace add yoeld-wix/quiet-bash
 ```
 
 Then add a `preToolUse` hook in `.github/hooks/quiet-bash.json` running
@@ -224,7 +224,7 @@ design; the hook adapters catch those.)
 **rc functions (simplest for your own terminal).** For interactive shells:
 
 ```bash
-echo 'source /abs/path/to/claude-quiet-bash/adapters/shell-wrapper.sh' >> ~/.zshrc
+echo 'source /abs/path/to/quiet-bash/adapters/shell-wrapper.sh' >> ~/.zshrc
 # or ~/.bashrc
 ```
 

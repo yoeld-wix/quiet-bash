@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.7.0] — 2026-06-21
+
+### Changed
+- **Renamed `claude-quiet-bash` → `quiet-bash`** across the repo, plugin name,
+  marketplace manifests, and install commands (repo now at
+  `github.com/yoeld-wix/quiet-bash`).
+- **New logo + icon** (`assets/logo.svg`, `assets/icon.svg`): noisy log lines
+  collapsing through a bash-prompt chevron into one quiet line — survives the
+  16px favicon test, legible on light and dark.
+
 ## [1.6.0] — 2026-06-21
 
 ### Added

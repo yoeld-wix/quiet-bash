@@ -4,7 +4,7 @@
 #
 # Source this from your ~/.bashrc or ~/.zshrc:
 #
-#     source /path/to/claude-quiet-bash/adapters/shell-wrapper.sh
+#     source /path/to/quiet-bash/adapters/shell-wrapper.sh
 #
 # Unlike the hook adapters, this works under ANY agent — Cursor, Aider,
 # Windsurf, Cline, OpenCode, etc. — and in your own terminal, because it

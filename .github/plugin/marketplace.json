@@ -1,18 +1,18 @@
 {
-  "name": "claude-quiet-bash",
+  "name": "quiet-bash",
   "owner": {
     "name": "yoeld-wix",
     "email": "yoeld-wix@users.noreply.github.com"
   },
   "metadata": {
     "description": "Quiets noisy command output (builds, tests, big git diffs) so it doesn't fill the agent's context window.",
-    "version": "1.6.0"
+    "version": "1.7.0"
   },
   "plugins": [
     {
-      "name": "claude-quiet-bash",
+      "name": "quiet-bash",
       "description": "Pre-exec hook + universal shell wrapper that redirects verbose command output to a temp log and leaves a one-line summary.",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "source": "."
     }
   ]

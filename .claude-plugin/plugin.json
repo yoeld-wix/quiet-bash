@@ -1,12 +1,12 @@
 {
-  "name": "claude-quiet-bash",
-  "version": "1.6.0",
+  "name": "quiet-bash",
+  "version": "1.7.0",
   "description": "Quiets noisy Bash commands (JS/npm, Python, JVM/Scala, Go, Rust, Ruby, make, docker, bazel, big git diffs) by redirecting full output to a temp log and surfacing only a summary — saving context tokens while preserving failure details.",
   "author": {
     "name": "yoeld-wix"
   },
-  "homepage": "https://github.com/yoeld-wix/claude-quiet-bash",
-  "repository": "https://github.com/yoeld-wix/claude-quiet-bash",
+  "homepage": "https://github.com/yoeld-wix/quiet-bash",
+  "repository": "https://github.com/yoeld-wix/quiet-bash",
   "license": "MIT",
   "keywords": [
     "claude-code",
