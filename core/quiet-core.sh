@@ -27,6 +27,24 @@ quiet_prune() {
     -mmin "+${QUIET_LOG_RETENTION_MINUTES}" -delete 2>/dev/null || true
 }
 
+# ── Runtime executor (for the shell-wrapper adapter) ─────────────────────────
+# Runs the given command, sending full output to a temp log and printing only a
+# summary; on failure it tails the log. Preserves the command's exit status.
+quiet_run() {
+  local log st ln
+  log=$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
+  "$@" >"$log" 2>&1
+  st=$?
+  ln=$(wc -l <"$log" | tr -d ' ')
+  if [ "$st" -eq 0 ]; then
+    echo "[ok: exit 0 — ${ln} lines hidden in ${log}; grep/tail it only if you need details]"
+  else
+    echo "[FAILED: exit ${st} — ${ln} lines in ${log} | last ${QUIET_FAIL_TAIL_LINES} below; grep that file for the rest]"
+    tail -n "${QUIET_FAIL_TAIL_LINES}" "$log"
+  fi
+  return "$st"
+}
+
 # Generic verbose runner: hide all output on success, tail the log on failure.
 _quiet_wrap_generic() {
   cat <<WRAP
