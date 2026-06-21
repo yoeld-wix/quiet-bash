@@ -52,16 +52,20 @@ of thumb:
 
 > total saving ≈ (share of your context that is command output) × 99 %
 
-The **99.9 %** cut on command output is measured. The session-level percentage
-is a model — it depends on how log-heavy your work is, and prompt caching /
-context compaction move it around — so treat ~30 % as a representative midpoint,
-not a guarantee.
+<p align="center">
+  <img src="assets/cost-by-workflow.svg" alt="Total token cost saved per dev workflow" width="760">
+</p>
 
 | Your workflow | Command output ≈ | Total token cost saved |
 |---|--:|--:|
 | Light (mostly reading/editing) | ~15–20 % of context | **~15–20 %** |
 | Typical (regular test/build loops) | ~30–40 % | **~30 %** |
 | Heavy (TDD, CI-debugging, full builds) | ~50–60 % | **~50 %+** |
+
+The **99.9 %** cut on command output is measured. The session-level percentage
+is a model — it depends on how log-heavy your work is, and prompt caching /
+context compaction move it around — so treat ~30 % as a representative midpoint,
+not a guarantee.
 
 ### Why it compounds over a session
 
