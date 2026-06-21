@@ -1,6 +1,6 @@
 # Graph Options
 
-The README currently uses `assets/savings.svg` and `assets/cost-by-workflow.svg`.
+The README currently uses `assets/savings-compact.svg` and `assets/workflow-context-stacks.svg`.
 These alternatives are ready-to-use if you want a different visual emphasis.
 
 ## Option A: Compact Benchmark Snapshot
@@ -28,9 +28,9 @@ The existing graphs are still good defaults when you want a detailed command
 breakdown and a simple workflow summary.
 
 <p align="center">
-  <img src="../assets/savings.svg" alt="Token savings per command" width="820">
+  <img src="../assets/savings-compact.svg" alt="Token savings per command" width="820">
 </p>
 
 <p align="center">
-  <img src="../assets/cost-by-workflow.svg" alt="Total token cost saved per dev workflow" width="760">
+  <img src="../assets/workflow-context-stacks.svg" alt="Total token cost saved per dev workflow" width="760">
 </p>

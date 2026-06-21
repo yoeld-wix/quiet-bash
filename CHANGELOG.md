@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.8.1] — 2026-06-21
+
+### Changed
+- Adopted the **sloth mascot logo** (`assets/logo.png`) and the **compact
+  benchmark / workflow charts** (`assets/savings-compact.svg`,
+  `assets/workflow-context-stacks.svg`) from the merged research PR as the
+  canonical brand assets; removed the earlier abstract SVG logo/icon and chart
+  variants. Fixed a viewBox clip in the workflow chart.
+
 ## [1.8.0] — 2026-06-21
 
 ### Added

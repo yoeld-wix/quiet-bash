@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.png" alt="quiet-bash" width="560">
+  <img src="assets/logo.png" alt="quiet-bash" width="320">
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.8.0-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.8.1-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
@@ -44,7 +44,7 @@ more in extra round-trips than it would save.
 > a `99.9%` cut on the command output that reaches the model.**
 
 <p align="center">
-  <img src="assets/savings.svg" alt="Token savings per command" width="820">
+  <img src="assets/savings-compact.svg" alt="536,957 raw tokens become 250 summary tokens" width="820">
 </p>
 
 | | Without quiet-bash | With quiet-bash | Reduction |
@@ -66,7 +66,7 @@ of thumb:
 > total saving ≈ (share of your context that is command output) × 99 %
 
 <p align="center">
-  <img src="assets/cost-by-workflow.svg" alt="Total token cost saved per dev workflow" width="760">
+  <img src="assets/workflow-context-stacks.svg" alt="Estimated session savings by workflow" width="820">
 </p>
 
 | Your workflow | Command output ≈ | Total token cost saved |
