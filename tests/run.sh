@@ -173,5 +173,36 @@ if command -v ruby >/dev/null 2>&1 || command -v yq >/dev/null 2>&1 || { command
 fi
 rm -rf "$QT"
 
+echo "== MCP proxy (universal, any client) =="
+if command -v node >/dev/null 2>&1; then
+  node --check "$ROOT/proxy/quiet-mcp-proxy.mjs" && pass "proxy parses (node --check)" || bad "proxy syntax"
+  PT=$(mktemp -d)
+cat > "$PT/up.mjs" <<'JS'
+import { createInterface } from 'node:readline'
+createInterface({ input: process.stdin }).on('line', (line) => {
+  let m; try { m = JSON.parse(line) } catch { return }
+  if (m.method === 'tools/call') {
+    const big = JSON.stringify({ items: Array.from({length:3000}, (_,i)=>({id:i,name:'pkg'})) })
+    process.stdout.write(JSON.stringify({ jsonrpc:'2.0', id:m.id, result:{ content:[{ type:'text', text:big }] } }) + '\n', () => process.exit(0))
+  }
+})
+JS
+cat > "$PT/up_small.mjs" <<'JS'
+import { createInterface } from 'node:readline'
+createInterface({ input: process.stdin }).on('line', (line) => {
+  let m; try { m = JSON.parse(line) } catch { return }
+  if (m.method === 'tools/call') process.stdout.write(JSON.stringify({ jsonrpc:'2.0', id:m.id, result:{ content:[{ type:'text', text:'tiny' }] } }) + '\n', () => process.exit(0))
+})
+JS
+  req='{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"q"}}'
+  pout=$(printf '%s\n' "$req" | node "$ROOT/proxy/quiet-mcp-proxy.mjs" node "$PT/up.mjs")
+  { printf '%s' "$pout" | jq -r '.result.content[0].text' | grep -q 'quiet-bash' && [ "$(printf '%s' "$pout" | wc -c)" -lt 6000 ]; } && pass "proxy collapses large tools/call result" || bad "proxy collapse"
+  pout2=$(printf '%s\n' "$req" | node "$ROOT/proxy/quiet-mcp-proxy.mjs" node "$PT/up_small.mjs")
+  [ "$(printf '%s' "$pout2" | jq -r '.result.content[0].text')" = "tiny" ] && pass "proxy passes small result through unchanged" || bad "proxy small passthrough"
+  rm -rf "$PT"
+else
+  echo "  (skipped — node not available)"
+fi
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.14.0] — 2026-06-22
+
+### Added
+- **Universal MCP proxy** (`proxy/quiet-mcp-proxy.mjs`, Node): a transport-level
+  proxy that wraps a real MCP server, forwards every message verbatim except
+  large `tools/call` results, which it spills + collapses via the shared
+  summarizer (`core/quiet-result.sh`). Works for **any** MCP client including
+  **Codex** and others without a result-rewrite hook. Lossless; tune with
+  `QUIET_RESULT_MIN_BYTES`. New `core/quiet-result.sh` CLI wrapper; node-gated
+  proxy tests + `node --check` in the suite.
+
 ## [1.13.0] — 2026-06-22
 
 ### Added

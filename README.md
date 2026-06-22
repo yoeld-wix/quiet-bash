@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.13.0-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.14.0-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
@@ -203,9 +203,28 @@ content also pass through. Lossless: only the *preview* shrinks. Tune with
 > ⚠️ Gemini has no success-preserving replace field — the only way to substitute
 > text is `decision:"deny"`+`reason`, which marks the call as *denied* (the model
 > may read it as a failed tool call). Use with that in mind. **Codex** can't
-> rewrite tool results yet; a transport-level **MCP proxy** (for any client) is
-> the planned universal path. The Claude Code adapter is contract-tested; the
+> rewrite tool results via a hook — for Codex and any other MCP client, use the
+> **MCP proxy** below. The Claude Code adapter is contract-tested; the
 > Copilot/Gemini result adapters follow documented schemas but aren't run live.
+
+#### Universal MCP proxy (any client, incl. Codex)
+
+For clients without a result-rewrite hook, `proxy/quiet-mcp-proxy.mjs` sits
+between the client and a real MCP server: it forwards every MCP message verbatim
+except large `tools/call` results, which it spills + collapses (same summarizer).
+Point your client's server config at the proxy instead of the server directly:
+
+```jsonc
+// before:  "command": "npx", "args": ["-y", "some-mcp-server"]
+// after:
+"command": "node",
+"args": ["/abs/path/to/quiet-bash/proxy/quiet-mcp-proxy.mjs", "npx", "-y", "some-mcp-server"]
+```
+
+Works for **any** MCP client (Claude Code, Codex, Cursor, …) since it operates at
+the transport layer. Lossless; tune with `QUIET_RESULT_MIN_BYTES`. Requires
+`node` (+ `bash`/`jq` for the summarizer). Buffers each result to measure size,
+so it's for request/response servers, not incremental streaming.
 
 ## Supported agents
 
