@@ -21,7 +21,7 @@
 : "${QUIET_FAIL_TAIL_LINES:=40}"         # lines of a failed command's log to surface
 : "${QUIET_LOG_RETENTION_MINUTES:=1440}" # prune redirect logs older than this (24h)
 : "${QUIET_JSON_MIN_BYTES:=25000}"       # summarize *.json dumps larger than this
-: "${QUIET_MCP_MIN_BYTES:=25000}"        # summarize MCP tool results larger than this
+: "${QUIET_RESULT_MIN_BYTES:=${QUIET_MCP_MIN_BYTES:-25000}}" # summarize tool results larger than this
 
 # Absolute dir of this core (so quiet_rewrite can point at sibling scripts).
 QUIET_CORE_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || QUIET_CORE_DIR=.

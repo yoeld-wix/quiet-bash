@@ -14,11 +14,11 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__.*",
+        "matcher": "mcp__.*|WebFetch|WebSearch",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/adapters/claude-code-mcp.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/adapters/claude-code-result.sh",
             "timeout": 10
           }
         ]

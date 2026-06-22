@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.12.0] — 2026-06-22
+
+### Changed
+- **Tool-result optimization now covers non-MCP tools too** (WebFetch, WebSearch
+  — not just MCP). Renamed `claude-code-mcp.sh` → `claude-code-result.sh`;
+  PostToolUse matcher broadened to `mcp__.*|WebFetch|WebSearch`. The adapter
+  mirrors the result's shape (string→string, MCP `content[]`→`content[]`) and
+  safely passes through any shape it doesn't recognize. Knob renamed
+  `QUIET_MCP_MIN_BYTES` → `QUIET_RESULT_MIN_BYTES` (old name still honored).
+
 ## [1.11.0] — 2026-06-22
 
 ### Added

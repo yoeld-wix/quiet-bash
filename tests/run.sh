@@ -106,14 +106,14 @@ else
   echo "  (skipped — no YAML converter: ruby / python3+PyYAML / yq)"
 fi
 
-echo "== MCP result optimization (Claude Code PostToolUse) =="
-MCP="$ROOT/adapters/claude-code-mcp.sh"
+echo "== tool-result optimization (Claude Code PostToolUse) =="
+MCP="$ROOT/adapters/claude-code-result.sh"
 # large JSON result → replaced with a collapsed summary
 bigjson=$(jq -nc '{items:[range(3000)|{id:.,name:"pkg",version:"1.0.0",url:"https://example.com/x"}]}')
 pj=$(jq -n --arg t "$bigjson" '{tool_name:"mcp__search__query", tool_response:{content:[{type:"text",text:$t}]}}')
 oj=$(printf '%s' "$pj" | "$MCP")
 rep=$(printf '%s' "$oj" | jq -r '.hookSpecificOutput.updatedToolOutput.content[0].text' 2>/dev/null)
-[ -n "$rep" ] && echo "$rep" | grep -q 'quiet-mcp' && pass "large JSON MCP result replaced" || bad "mcp json replace"
+[ -n "$rep" ] && echo "$rep" | grep -q 'quiet-bash' && pass "large JSON MCP result replaced" || bad "mcp json replace"
 [ "${#rep}" -lt "${#bigjson}" ] && pass "mcp summary smaller than raw (${#rep} < ${#bigjson})" || bad "mcp json not smaller"
 echo "$rep" | grep -q 'more of 3000' && pass "mcp json collapses repeated shape" || bad "mcp json collapse"
 # large TEXT result → spilled with head/tail
@@ -130,6 +130,15 @@ pw=$(jq -n --arg t "[quiet-mcp] already done $bigtext" '{tool_name:"mcp__x__y", 
 # non-text content (image) → pass through
 pi=$(jq -n '{tool_name:"mcp__x__y", tool_response:{content:[{type:"image",data:"AAAA"}]}}')
 [ -z "$(printf '%s' "$pi" | "$MCP")" ] && pass "non-text MCP content passes through" || bad "mcp non-text passthrough"
+# NON-MCP tool with a STRING result (e.g. WebFetch) → replaced, mirroring string shape
+bigstr=$(for i in $(seq 1 4000); do echo "fetched paragraph $i with a fair amount of text in it"; done)
+pstr=$(jq -n --arg t "$bigstr" '{tool_name:"WebFetch", tool_response:$t}')
+ostr=$(printf '%s' "$pstr" | "$MCP")
+[ "$(printf '%s' "$ostr" | jq -r '.hookSpecificOutput.updatedToolOutput | type')" = "string" ] && pass "string result → string updatedToolOutput (shape mirrored)" || bad "string result shape"
+printf '%s' "$ostr" | jq -r '.hookSpecificOutput.updatedToolOutput' | grep -q 'spilled to' && pass "WebFetch string result spilled" || bad "webfetch spill"
+# unknown shape (object, no content[]) → pass through (safe no-op)
+poth=$(jq -n --arg t "$bigstr" '{tool_name:"Weird", tool_response:{weird:$t}}')
+[ -z "$(printf '%s' "$poth" | "$MCP")" ] && pass "unknown result shape passes through" || bad "unknown shape passthrough"
 
 echo "== quiet-query (smart query / aggregation) =="
 QQ="$ROOT/core/quiet-query.sh"
