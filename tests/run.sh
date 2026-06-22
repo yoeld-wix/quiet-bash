@@ -106,5 +106,30 @@ else
   echo "  (skipped — no YAML converter: ruby / python3+PyYAML / yq)"
 fi
 
+echo "== MCP result optimization (Claude Code PostToolUse) =="
+MCP="$ROOT/adapters/claude-code-mcp.sh"
+# large JSON result → replaced with a collapsed summary
+bigjson=$(jq -nc '{items:[range(3000)|{id:.,name:"pkg",version:"1.0.0",url:"https://example.com/x"}]}')
+pj=$(jq -n --arg t "$bigjson" '{tool_name:"mcp__search__query", tool_response:{content:[{type:"text",text:$t}]}}')
+oj=$(printf '%s' "$pj" | "$MCP")
+rep=$(printf '%s' "$oj" | jq -r '.hookSpecificOutput.updatedToolOutput.content[0].text' 2>/dev/null)
+[ -n "$rep" ] && echo "$rep" | grep -q 'quiet-mcp' && pass "large JSON MCP result replaced" || bad "mcp json replace"
+[ "${#rep}" -lt "${#bigjson}" ] && pass "mcp summary smaller than raw (${#rep} < ${#bigjson})" || bad "mcp json not smaller"
+echo "$rep" | grep -q 'more of 3000' && pass "mcp json collapses repeated shape" || bad "mcp json collapse"
+# large TEXT result → spilled with head/tail
+bigtext=$(for i in $(seq 1 4000); do echo "log line $i: something happened here with detail"; done)
+pt=$(jq -n --arg t "$bigtext" '{tool_name:"mcp__web__fetch", tool_response:{content:[{type:"text",text:$t}]}}')
+ot=$(printf '%s' "$pt" | "$MCP" | jq -r '.hookSpecificOutput.updatedToolOutput.content[0].text' 2>/dev/null)
+echo "$ot" | grep -q 'spilled to' && echo "$ot" | grep -q 'first 20 lines' && pass "large text MCP result spilled + head/tail" || bad "mcp text spill"
+# small result → pass through (no output)
+ps=$(jq -n '{tool_name:"mcp__x__y", tool_response:{content:[{type:"text",text:"tiny result"}]}}')
+[ -z "$(printf '%s' "$ps" | "$MCP")" ] && pass "small MCP result passes through" || bad "mcp small passthrough"
+# already-wrapped → no double wrap
+pw=$(jq -n --arg t "[quiet-mcp] already done $bigtext" '{tool_name:"mcp__x__y", tool_response:{content:[{type:"text",text:$t}]}}')
+[ -z "$(printf '%s' "$pw" | "$MCP")" ] && pass "no double-wrap of quiet-mcp output" || bad "mcp double-wrap guard"
+# non-text content (image) → pass through
+pi=$(jq -n '{tool_name:"mcp__x__y", tool_response:{content:[{type:"image",data:"AAAA"}]}}')
+[ -z "$(printf '%s' "$pi" | "$MCP")" ] && pass "non-text MCP content passes through" || bad "mcp non-text passthrough"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

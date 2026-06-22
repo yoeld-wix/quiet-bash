@@ -11,6 +11,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/adapters/claude-code-mcp.sh",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

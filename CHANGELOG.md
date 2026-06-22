@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.10.0] — 2026-06-22
+
+### Added
+- **Large MCP response optimization** (Claude Code `PostToolUse` hook, matcher
+  `mcp__.*`): when an MCP tool result exceeds `QUIET_MCP_MIN_BYTES` (25 KB), the
+  full byte-exact payload is spilled to a file and the model sees a compact
+  summary instead — JSON results reuse the collapsed-preview + `jq` footer; text
+  results get head/tail + a `sed`/`grep` drill-in. Replaces the result via
+  `hookSpecificOutput.updatedToolOutput`. Small results and non-text content pass
+  through. New adapter `adapters/claude-code-mcp.sh`; MCP tests added.
+- Lossless by design (only the preview shrinks). Gemini/Copilot adapters and a
+  universal MCP proxy are planned; Codex can't rewrite results yet.
+
 ## [1.9.1] — 2026-06-22
 
 ### Fixed

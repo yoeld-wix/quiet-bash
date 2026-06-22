@@ -1,6 +1,6 @@
 {
   "name": "quiet-bash",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "description": "Quiets noisy Bash commands (JS/npm, Python, JVM/Scala, Go, Rust, Ruby, make, docker, bazel, big git diffs) by redirecting full output to a temp log and surfacing only a summary — saving context tokens while preserving failure details.",
   "author": {
     "name": "yoeld-wix"

@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.9.1-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.10.0-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
@@ -150,6 +150,28 @@ by distinct names, so `package-lock.json` barely shrank.)
 Pass-through is deliberate: small files, `jq`/`yq` **projections** (you already
 narrowed it), and piped/redirected commands are never touched. Tune with
 `QUIET_JSON_MIN_BYTES` (default 25000).
+
+### Large MCP responses
+
+MCP tool *results* are the third big context sink — web-search dumps, DB rows,
+API payloads land in context whole and get re-sent every later turn. On
+**Claude Code**, a `PostToolUse` hook (matcher `mcp__.*`) fires after an MCP tool
+returns: if the result is large it **spills the byte-exact payload to a file**
+and replaces what the model sees with a compact summary —
+
+- **JSON result** → the same collapsed preview + `jq` drill-in footer;
+- **plain-text result** → head + tail + `"…spilled to <file>"` with a `sed`/`grep`
+  drill-in.
+
+The full result is one `jq`/`sed` away (run via the agent's own Bash tool, which
+is itself quiet-bash-wrapped). Lossless by design — only the *preview* is reduced,
+never the spilled payload. Small results and non-text content pass through. Tune
+with `QUIET_MCP_MIN_BYTES` (default 25000).
+
+> Today this is the **Claude Code** path (PostToolUse `updatedToolOutput`).
+> Gemini and Copilot expose equivalent result-rewrite hooks (adapters planned);
+> **Codex** can't rewrite results yet, and a transport-level **MCP proxy** (for
+> any client) is the planned universal path.
 
 ## Supported agents
 
