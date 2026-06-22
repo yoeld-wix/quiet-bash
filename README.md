@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.9.0-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.9.1-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
@@ -175,10 +175,14 @@ So: agents with a command-rewriting hook use a hook; everything else (Cursor and
 Aider have no command-rewrite hook) uses the shell wrapper. Either way, you're
 covered.
 
-> The Claude Code adapter and the shell wrapper are tested. The Codex, Gemini,
-> and Copilot adapters are written to each tool's **documented** hook format but
-> have not been verified against a live install — confirm field names against
-> your version, and please open an issue/PR if anything needs adjusting.
+> **Verification status.** The Claude Code adapter, the shell wrapper, and the
+> PATH shims are tested end-to-end. The Codex, Gemini, and Copilot adapters are
+> **contract-verified** — their input parsing and output shape are tested against
+> each CLI's documented hook schema (this caught a real bug: Copilot sends
+> `toolArgs` as a JSON-encoded *string*, now handled). They have **not** yet been
+> run against a live authenticated CLI. Known caveat: Codex's `updatedInput`
+> rewrite needs a recent Codex version (older ones reject it). Issues/PRs from
+> live users welcome.
 
 ## Install
 

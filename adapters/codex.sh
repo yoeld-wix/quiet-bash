@@ -7,8 +7,11 @@
 # command by emitting `permissionDecision: "allow"` together with
 # `hookSpecificOutput.updatedInput.command` — the same shape as Claude Code.
 #
-# NOTE: written to the documented format; verify against your Codex version.
-# Caveat (per docs): PreToolUse may not intercept every shell path yet.
+# Verified against the documented schema: input .tool_input.command (tool_name
+# "Bash"), output hookSpecificOutput.updatedInput.command + permissionDecision
+# "allow". Caveats: the `updatedInput` rewrite requires a recent Codex (older
+# versions reject it); PreToolUse may not intercept every shell path yet. Not
+# yet exercised against a live authenticated CLI.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/core/quiet-core.sh"

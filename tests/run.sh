@@ -35,13 +35,21 @@ shape() { # adapter  jqpath  name
   got=$(printf '%s' "$PE" | "$ROOT/adapters/$1")
   [ -z "$got" ] && pass "$3 passes through" || bad "$3 should pass through"
 }
+# Codex & Gemini send the command under .tool_input.command (real schema).
 shape claude-code.sh '.hookSpecificOutput.updatedInput.command'        "claude-code"
 shape codex.sh       '.hookSpecificOutput.updatedInput.command'        "codex"
 shape gemini.sh      '.hookSpecificOutput.tool_input.command'          "gemini"
-shape copilot.sh     '.modifiedArgs.command'                           "copilot"
-# codex + copilot must say permissionDecision: allow
-[ "$(printf '%s' "$EV" | "$ROOT/adapters/codex.sh"   | jq -r '.hookSpecificOutput.permissionDecision')" = "allow" ] && pass "codex allow"   || bad "codex allow"
-[ "$(printf '%s' "$EV" | "$ROOT/adapters/copilot.sh" | jq -r '.permissionDecision')" = "allow" ] && pass "copilot allow" || bad "copilot allow"
+[ "$(printf '%s' "$EV" | "$ROOT/adapters/codex.sh" | jq -r '.hookSpecificOutput.permissionDecision')" = "allow" ] && pass "codex allow" || bad "codex allow"
+
+# Copilot uses the REAL documented payload: toolArgs is a JSON-encoded STRING.
+CEV='{"toolName":"bash","toolArgs":"{\"command\":\"yarn test\"}"}'
+CPE='{"toolName":"bash","toolArgs":"{\"command\":\"ls -la\"}"}'
+co=$(printf '%s' "$CEV" | "$ROOT/adapters/copilot.sh")
+[ "$(printf '%s' "$co" | jq -r '.modifiedArgs.command' 2>/dev/null | head -c1)" != "" ] && pass "copilot parses toolArgs string + wraps" || bad "copilot toolArgs parse"
+[ "$(printf '%s' "$co" | jq -r '.permissionDecision' 2>/dev/null)" = "allow" ] && pass "copilot allow" || bad "copilot allow"
+[ -z "$(printf '%s' "$CPE" | "$ROOT/adapters/copilot.sh")" ] && pass "copilot small passes through" || bad "copilot passthrough"
+# snake_case alias also accepted
+[ -n "$(printf '%s' '{"tool_input":{"command":"yarn test"}}' | "$ROOT/adapters/copilot.sh" | jq -r '.modifiedArgs.command' 2>/dev/null)" ] && pass "copilot snake_case alias" || bad "copilot alias"
 
 echo "== shims: wrap / passthrough via PATH =="
 TMP=$(mktemp -d)

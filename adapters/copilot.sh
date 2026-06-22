@@ -12,7 +12,9 @@
 # This adapter therefore never errors out (always exits 0) and only emits a
 # decision when it actually rewrites.
 #
-# NOTE: written to the documented format; verify against your Copilot CLI version.
+# Verified against the documented Copilot hook schema (input + output): toolName
+# "bash", toolArgs is a JSON-encoded string, output uses modifiedArgs +
+# permissionDecision. Not yet exercised against a live authenticated CLI.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/core/quiet-core.sh"
@@ -20,7 +22,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 quiet_prune
 
 input=$(cat)
-cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // .arguments.command // .args.command // empty')
+# Copilot sends `toolArgs` as a JSON-encoded STRING (e.g. "{\"command\":\"ls\"}"),
+# so it must be double-decoded. Also accept the VS Code-style snake_case alias.
+cmd=$(printf '%s' "$input" | jq -r '
+  (.tool_input.command)
+  // ( .toolArgs | if type=="string" then (try fromjson catch null) else . end | .command? )
+  // empty')
 
 if rewritten=$(quiet_rewrite "$cmd"); then
   jq -n --arg c "$rewritten" \

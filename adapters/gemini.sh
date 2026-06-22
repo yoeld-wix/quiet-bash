@@ -7,7 +7,9 @@
 # `hookSpecificOutput.tool_input` — an object that merges with and overrides the
 # model's arguments. For the shell tool that argument is `command`.
 #
-# NOTE: written to the documented format; verify against your Gemini CLI version.
+# Verified against the documented schema: input .tool_input.command (tool_name
+# "run_shell_command"), output hookSpecificOutput.tool_input.command. Not yet
+# exercised against a live authenticated CLI.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/core/quiet-core.sh"

@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.9.1] — 2026-06-22
+
+### Fixed
+- **Copilot adapter**: parse the command from `toolArgs` (a JSON-encoded
+  *string* that must be double-decoded) plus the snake_case `tool_input` alias —
+  the previous code read non-existent fields and silently no-op'd. Found by
+  contract-verifying adapter input parsing against each CLI's documented hook
+  schema; tests now use the real per-CLI payloads.
+
+### Notes
+- Codex/Gemini adapters confirmed against their documented schemas
+  (`.tool_input.command`). Codex's `updatedInput` rewrite requires a recent
+  Codex version. Adapters are contract-verified but not yet run live.
+
 ## [1.9.0] — 2026-06-21
 
 ### Added

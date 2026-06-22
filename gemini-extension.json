@@ -1,5 +1,5 @@
 {
   "name": "quiet-bash",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "Quiets noisy command output (builds, tests, big git diffs) so it doesn't fill the model's context window."
 }
