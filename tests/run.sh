@@ -204,5 +204,42 @@ else
   echo "  (skipped — node not available)"
 fi
 
+echo "== source-file outlining =="
+QO="$ROOT/core/quiet-outline.sh"
+OT=$(mktemp -d)
+# A large (>30KB) Python file with many symbols.
+{
+  echo "import os"
+  echo "import sys"
+  echo "from typing import List"
+  for i in $(seq 1 400); do
+    echo ""
+    echo "def func_${i}(a, b):"
+    echo "    # padding to grow the file well past the byte threshold xxxxxxxxxxxxxxxxxxxx"
+    echo "    return a + b + ${i}"
+  done
+  echo ""
+  echo "class Widget:"
+  echo "    def render(self):"
+  echo "        return 'MARKER_RENDER_BODY'"
+} > "$OT/big.py"
+po=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/big.py")
+printf '%s' "$po" | grep -q '^\[quiet-bash\].*Python.*outline' && pass "python file outlined" || bad "python outline header"
+printf '%s' "$po" | grep -q 'def func_1(a, b)' && pass "python signature shown" || bad "python signature"
+printf '%s' "$po" | grep -qE 'body [0-9]+-[0-9]+' && pass "python body ranges shown" || bad "python body range"
+# Range correctness: the Widget.render body range must contain the marker.
+rng=$(printf '%s\n' "$po" | sed -n 's/.*render.*body \([0-9]*\)-\([0-9]*\)$/\1 \2/p' | head -1)
+set -- $rng
+[ -n "${1:-}" ] && sed -n "${1},${2}p" "$OT/big.py" | grep -q 'MARKER_RENDER_BODY' \
+  && pass "python range expands to the real body" || bad "python range correctness"
+# Symbol floor: a source-extension file with <3 symbols falls back to raw cat.
+{ echo "x = 1"; for i in $(seq 1 4000); do echo "# comment line $i padding padding padding"; done; } > "$OT/data.py"
+pf=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/data.py")
+printf '%s' "$pf" | grep -q '^\[quiet-bash\]' && bad "symbol-floor should NOT outline" || pass "symbol-floor falls back to raw"
+# Non-source extension → raw passthrough.
+{ for i in $(seq 1 4000); do echo "plain text line $i"; done; } > "$OT/notes.txt"
+pn=$("$QO" "$OT/notes.txt")
+printf '%s' "$pn" | grep -q '^\[quiet-bash\]' && bad ".txt should not be outlined" || pass "non-source extension passthrough"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
