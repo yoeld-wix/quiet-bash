@@ -269,6 +269,13 @@ quiet_rewrite "cat $OT/big.py | grep def" >/dev/null && bad "piped read should p
 # small source file is left alone
 echo "def tiny(): pass" > "$OT/tiny.py"
 quiet_rewrite "cat $OT/tiny.py" >/dev/null && bad "small file should pass through" || pass "small source read passes through"
+# Native Read path: tool_input.path to a large source file → outline in updatedToolOutput
+CR="$ROOT/adapters/claude-code-result.sh"
+content=$(cat "$OT/big.py")
+payload=$(jq -n --arg p "$OT/big.py" --arg c "$content" '{tool_name:"Read", tool_input:{path:$p}, tool_response:$c}')
+ro=$(printf '%s' "$payload" | QUIET_OUTLINE_MIN_BYTES=30000 "$CR")
+printf '%s' "$ro" | jq -r '.hookSpecificOutput.updatedToolOutput' 2>/dev/null | grep -q 'outline' \
+  && pass "native Read of big.py is outlined" || bad "native Read outline"
 rm -rf "$OT"
 
 echo

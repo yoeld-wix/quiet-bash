@@ -40,7 +40,20 @@ text=$(printf '%s' "$input" | jq -r '
 
 tool=$(printf '%s' "$input" | jq -r '.tool_name // "tool"')
 
-summary=$(quiet_result_summarize "$text" "$tool") || exit 0   # small/empty → pass through
+# Source-file outline: if this was a read of a large source file, outline the real file.
+summary=""
+path=$(printf '%s' "$input" | jq -r '.tool_input.path // .tool_input.file_path // empty' 2>/dev/null)
+if [ -n "$path" ] && [ -f "$path" ]; then
+  case "${path##*.}" in
+    py|js|mjs|cjs|jsx|ts|tsx|go|rs|java|kt|kts|scala|rb|c|h|cc|cpp|cxx|hpp|php|swift)
+      if [ "$(wc -c <"$path" 2>/dev/null || echo 0)" -gt "${QUIET_OUTLINE_MIN_BYTES}" ]; then
+        osum=$("$ROOT/core/quiet-outline.sh" "$path")
+        case "$osum" in '[quiet-bash]'*) summary="$osum" ;; esac
+      fi ;;
+  esac
+fi
+
+[ -z "$summary" ] && { summary=$(quiet_result_summarize "$text" "$tool") || exit 0; }   # small/empty → pass through
 
 # Emit a replacement that mirrors the original shape.
 if [ "$shape" = "string" ]; then
