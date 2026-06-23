@@ -230,8 +230,12 @@ printf '%s' "$po" | grep -qE 'body [0-9]+-[0-9]+' && pass "python body ranges sh
 # Range correctness: the Widget.render body range must contain the marker.
 rng=$(printf '%s\n' "$po" | sed -n 's/.*render.*body \([0-9]*\)-\([0-9]*\)$/\1 \2/p' | head -1)
 set -- $rng
-[ -n "${1:-}" ] && sed -n "${1},${2}p" "$OT/big.py" | grep -q 'MARKER_RENDER_BODY' \
+[ -n "${1:-}" ] && sed -n "${1:-1},${2:-1}p" "$OT/big.py" | grep -q 'MARKER_RENDER_BODY' \
   && pass "python range expands to the real body" || bad "python range correctness"
+# Byte threshold: small file (<30KB) with many symbols should NOT outline
+{ echo "def a(): pass"; echo "def b(): pass"; echo "def c(): pass"; echo "def d(): pass"; } > "$OT/smallmany.py"
+ps=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/smallmany.py")
+printf '%s' "$ps" | grep -q '^\[quiet-bash\]' && bad "small file with many symbols should NOT outline" || pass "byte threshold: small file passes through raw"
 # Symbol floor: a source-extension file with <3 symbols falls back to raw cat.
 { echo "x = 1"; for i in $(seq 1 4000); do echo "# comment line $i padding padding padding"; done; } > "$OT/data.py"
 pf=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/data.py")

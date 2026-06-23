@@ -27,6 +27,9 @@ case "$ext" in
   *) exec cat "$f" ;;   # not a known source extension → leave it
 esac
 
+# Enforce byte threshold: pass through small files
+[ "$(wc -c <"$f" 2>/dev/null || echo 0)" -lt "${QUIET_OUTLINE_MIN_BYTES}" ] && exec cat "$f"
+
 import_re='^[[:space:]]*(import|from|#include|use|require|using|package)([[:space:]]|\()'
 
 sym_lines=$(grep -nE "$sig" "$f" 2>/dev/null | cut -d: -f1 | tr '\n' ' ')
