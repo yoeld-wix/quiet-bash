@@ -262,6 +262,13 @@ pb=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/big.rb"); printf '%s' "$pb" | grep
 # C
 { echo "#include <stdio.h>"; for i in $(seq 1 400); do echo "int fn${i}(int a) { return a + ${i}; }"; echo "// padding to grow file past threshold xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done; echo "struct S { int x; };"; } > "$OT/big.c"
 pc=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/big.c"); printf '%s' "$pc" | grep -q '^\[quiet-bash\].*C/C++.*outline' && printf '%s' "$pc" | grep -q 'fn1' && pass "c outlined" || bad "c outline"
+# quiet_rewrite routes a large source read to the outliner
+qr=$(quiet_rewrite "cat $OT/big.py") && printf '%s' "$qr" | grep -q 'quiet-outline.sh' && pass "rewrite routes big.py to outliner" || bad "rewrite big.py"
+# piped read is left alone
+quiet_rewrite "cat $OT/big.py | grep def" >/dev/null && bad "piped read should pass through" || pass "piped source read passes through"
+# small source file is left alone
+echo "def tiny(): pass" > "$OT/tiny.py"
+quiet_rewrite "cat $OT/tiny.py" >/dev/null && bad "small file should pass through" || pass "small source read passes through"
 rm -rf "$OT"
 
 echo

@@ -148,7 +148,7 @@ quiet_rewrite() {
 
   # Never double-wrap, and never wrap a follow-up read of a redirect log.
   case "$cmd" in
-    *__log=* | *"${QUIET_LOG_PREFIX}"* | *quiet-json.sh*) return 1 ;;
+    *__log=* | *"${QUIET_LOG_PREFIX}"* | *quiet-json.sh* | *quiet-outline.sh*) return 1 ;;
   esac
 
   # ── JSON/YAML read optimization: summarize a large structured-data dump ──
@@ -175,6 +175,21 @@ quiet_rewrite() {
           printf '%q %q' "${QUIET_CORE_DIR}/quiet-json.sh" "$jfile"
           return 0
         fi
+      fi
+      ;;
+  esac
+
+  # ── Source-file outline: large code file read → signature skeleton ──
+  case "$cmd" in
+    *'|'* | *'>'*) : ;;   # piped/redirected → skip
+    *)
+      local sfile
+      sfile=$(printf '%s' "$cmd" | grep -oE '[^[:space:]]+\.(py|js|mjs|cjs|jsx|ts|tsx|go|rs|java|kt|kts|scala|rb|c|h|cc|cpp|cxx|hpp|php|swift)' | head -1)
+      if [ -n "$sfile" ] && [ -f "$sfile" ] \
+         && [ "$(wc -c <"$sfile" 2>/dev/null || echo 0)" -gt "${QUIET_OUTLINE_MIN_BYTES}" ] \
+         && printf '%s' "$cmd" | grep -qE '(^|[[:space:];&|(])(cat|bat|less|more|head|tail)[[:space:]]'; then
+        printf '%q %q' "${QUIET_CORE_DIR}/quiet-outline.sh" "$sfile"
+        return 0
       fi
       ;;
   esac
