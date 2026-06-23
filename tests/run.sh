@@ -244,6 +244,25 @@ printf '%s' "$pf" | grep -q '^\[quiet-bash\]' && bad "symbol-floor should NOT ou
 { for i in $(seq 1 4000); do echo "plain text line $i"; done; } > "$OT/notes.txt"
 pn=$("$QO" "$OT/notes.txt")
 printf '%s' "$pn" | grep -q '^\[quiet-bash\]' && bad ".txt should not be outlined" || pass "non-source extension passthrough"
+# TypeScript
+{ echo "import x from 'y'"; for i in $(seq 1 300); do echo "export function fn${i}(a: number): number { return a + ${i} }"; echo "// padding to grow file past threshold xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done; echo "export class Svc { run(): void { return } }"; } > "$OT/big.ts"
+pt=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/big.ts"); printf '%s' "$pt" | grep -q '^\[quiet-bash\].*JS/TS.*outline' && printf '%s' "$pt" | grep -q 'export function fn1' && pass "ts outlined" || bad "ts outline"
+# Go
+{ echo "package main"; echo "import \"fmt\""; for i in $(seq 1 400); do echo "func Fn${i}() int { return ${i} }"; echo "// padding to grow file past threshold xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done; echo "type T struct { x int }"; } > "$OT/big.go"
+pg=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/big.go"); printf '%s' "$pg" | grep -q '^\[quiet-bash\].*Go.*outline' && printf '%s' "$pg" | grep -q 'func Fn1' && pass "go outlined" || bad "go outline"
+# Rust
+{ echo "use std::io;"; for i in $(seq 1 400); do echo "pub fn fn${i}() -> i32 { ${i} }"; echo "// padding to grow file past threshold xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done; echo "struct S { x: i32 }"; } > "$OT/big.rs"
+pr=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/big.rs"); printf '%s' "$pr" | grep -q '^\[quiet-bash\].*Rust.*outline' && printf '%s' "$pr" | grep -q 'fn fn1' && pass "rust outlined" || bad "rust outline"
+# Java
+{ echo "package a;"; echo "public class C {"; for i in $(seq 1 400); do echo "  public int m${i}() { return ${i}; }"; echo "  // padding to grow file past threshold xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done; echo "}"; } > "$OT/big.java"
+pj=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/big.java"); printf '%s' "$pj" | grep -q '^\[quiet-bash\].*Java.*outline' && printf '%s' "$pj" | grep -q 'class C' && pass "java outlined" || bad "java outline"
+# Ruby
+{ echo "require 'set'"; echo "class C"; for i in $(seq 1 400); do echo "  def m${i}; ${i}; end"; echo "  # padding to grow file past threshold xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done; echo "end"; } > "$OT/big.rb"
+pb=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/big.rb"); printf '%s' "$pb" | grep -q '^\[quiet-bash\].*Ruby.*outline' && printf '%s' "$pb" | grep -q 'def m1' && pass "ruby outlined" || bad "ruby outline"
+# C
+{ echo "#include <stdio.h>"; for i in $(seq 1 400); do echo "int fn${i}(int a) { return a + ${i}; }"; echo "// padding to grow file past threshold xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done; echo "struct S { int x; };"; } > "$OT/big.c"
+pc=$(QUIET_OUTLINE_MIN_BYTES=30000 "$QO" "$OT/big.c"); printf '%s' "$pc" | grep -q '^\[quiet-bash\].*C/C++.*outline' && printf '%s' "$pc" | grep -q 'fn1' && pass "c outlined" || bad "c outline"
+rm -rf "$OT"
 
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

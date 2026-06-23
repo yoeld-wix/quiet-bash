@@ -24,6 +24,26 @@ lang=""; sig=""
 case "$ext" in
   py) lang="Python"
       sig='^[[:space:]]*(async[[:space:]]+def|def|class)[[:space:]]' ;;
+  js|mjs|cjs|jsx|ts|tsx) lang="JS/TS"
+      sig='^[[:space:]]*((export([[:space:]]+default)?[[:space:]]+)?(async[[:space:]]+)?(function\*?|class|interface|type|enum)[[:space:]]|(export[[:space:]]+)?(const|let|var)[[:space:]]+[A-Za-z0-9_$]+[[:space:]]*=[[:space:]]*(async[[:space:]]+)?(\(|function|[A-Za-z0-9_$]+[[:space:]]*=>))' ;;
+  go) lang="Go"
+      sig='^(func|type)[[:space:]]' ;;
+  rs) lang="Rust"
+      sig='^[[:space:]]*(pub[[:space:]]+)?(async[[:space:]]+)?(fn|struct|enum|trait|impl|mod)[[:space:]]' ;;
+  java) lang="Java"
+      sig='^[[:space:]]*(public|private|protected|static|final|abstract|class|interface|enum)[[:space:]]' ;;
+  kt|kts) lang="Kotlin"
+      sig='^[[:space:]]*(fun|class|interface|object|enum|val|var)[[:space:]]' ;;
+  scala) lang="Scala"
+      sig='^[[:space:]]*(def|class|object|trait|case[[:space:]]+class)[[:space:]]' ;;
+  rb) lang="Ruby"
+      sig='^[[:space:]]*(def|class|module)[[:space:]]' ;;
+  c|h|cc|cpp|cxx|hpp) lang="C/C++"
+      sig='^[[:space:]]*(struct|class|enum|typedef)[[:space:]]|^[A-Za-z_][A-Za-z0-9_<>:,*& ]*[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(' ;;
+  php) lang="PHP"
+      sig='^[[:space:]]*((public|private|protected|static|abstract|final)[[:space:]]+)*(function|class|interface|trait)[[:space:]]' ;;
+  swift) lang="Swift"
+      sig='^[[:space:]]*((public|private|internal|fileprivate|open|final|static|override)[[:space:]]+)*(func|class|struct|enum|protocol|extension)[[:space:]]' ;;
   *) exec cat "$f" ;;   # not a known source extension → leave it
 esac
 
