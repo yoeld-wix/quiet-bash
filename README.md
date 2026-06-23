@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.14.0-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.15.0-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
@@ -118,6 +118,7 @@ failure it still surfaces the last 40 lines inline, and small `git diff`/`show`/
 | **Containers / CI:** `docker build`, `docker compose`/`docker-compose`, `bk`/`buildkite` | same |
 | `git diff` / `git show` / `git log` (without a limiting flag, pipe, or redirect) | ≤60 lines → shown inline. Larger → `--stat`/`--oneline` summary + log path. Failure → tail. |
 | **Large `*.json` / `*.yaml` reads** (`cat`/`bat`/`head`/`jq .`/`yq .` of a file > 25 KB) | Collapsed preview: repeated object/array shapes fold to `"N more of M, same shape"`, long strings truncated, + a `jq`/`yq` drill-in footer. File untouched on disk. |
+| **Large source files** (`cat`/`Read` of a `.py`/`.ts`/`.go`/`.rs`/`.java`/`.rb`/`.c`/… file > 30 KB) | Signature outline: imports + class/function/method signatures with bodies elided, each with the exact line range to expand (`Read <file> offset=S limit=N`). File untouched on disk. < 3 symbols → falls back to head/tail. |
 | everything else (`ls`, `cat`, `grep`, `git status`, `gh …`, …) | Passed through unchanged. |
 
 Already-bounded commands (those with `--stat`, `--oneline`, a pipe to
@@ -171,6 +172,23 @@ quiet-query <file> search '<regex>'          # matching paths
 
 Works on JSON and YAML (shared converter). The agent runs these through its own
 Bash tool, so a 300 K-token result becomes a handful of tiny, targeted queries.
+
+### Outlining large source files
+
+Reading a 1,800-line module dumps thousands of tokens the agent mostly skims —
+and because the transcript is re-sent every turn, that file is re-billed on every
+later turn. quiet-bash rewrites a large source-file read into a **signature
+outline**: imports plus class/function/method signatures, bodies elided, each
+annotated with the exact line range. The agent expands any body with a single
+`Read <file> offset=<start> limit=<n>` (or `sed -n 'S,Ep' <file>`). The file is
+never modified — it *is* the byte-exact backup.
+
+Zero dependencies: symbols are found with `grep`/`awk` (no tree-sitter or ctags
+required). Covers Python, JS/TS, Go, Rust, Java/Kotlin/Scala, Ruby, C/C++, PHP,
+and Swift. Guards against regression: only files over `QUIET_OUTLINE_MIN_BYTES`
+(default 30000) are outlined, only known source extensions, and a file with
+fewer than `QUIET_OUTLINE_MIN_SYMBOLS` (default 3) symbols falls back to the
+normal head/tail preview.
 
 ### Large tool results (MCP, WebFetch, WebSearch — not just MCP)
 
@@ -353,6 +371,9 @@ Override via environment variables (defaults shown):
 | `QUIET_INLINE_LINE_LIMIT` | `60` | git output up to this many lines is shown inline |
 | `QUIET_FAIL_TAIL_LINES` | `40` | lines of a failed command's log to surface |
 | `QUIET_LOG_RETENTION_MINUTES` | `1440` | prune redirect logs older than this on each run |
+
+- `QUIET_OUTLINE_MIN_BYTES` (default 30000) — outline source files larger than this.
+- `QUIET_OUTLINE_MIN_SYMBOLS` (default 3) — below this many symbols, skip outlining.
 
 To cover more commands, extend the `always`/`managed` patterns in
 `core/quiet-core.sh`.

@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.15.0] — 2026-06-23
+
+### Added
+- **Source-file outlining** (`core/quiet-outline.sh`): large source reads
+  (`.py`/`.ts`/`.go`/`.rs`/`.java`/`.rb`/`.c`/… > 30 KB) are replaced by a
+  zero-dependency signature skeleton — imports + class/function/method
+  signatures with bodies elided, each with the exact line range to expand
+  (`Read <file> offset=S limit=N`). Wired into both the Bash `cat` path
+  (`quiet_rewrite`) and the native `Read` path (PostToolUse adapter). The file
+  on disk is the byte-exact backup; no spill is created. Guards: size threshold,
+  source-extension allowlist, and a symbol-count floor (falls back to head/tail).
+  New knobs `QUIET_OUTLINE_MIN_BYTES` (30000), `QUIET_OUTLINE_MIN_SYMBOLS` (3).
+
 ## [1.14.0] — 2026-06-22
 
 ### Added
