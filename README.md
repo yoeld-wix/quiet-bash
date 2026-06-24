@@ -37,6 +37,13 @@ the rest), so nothing important is lost.
 Short, quick commands are passed through untouched: wrapping them would cost
 more in extra round-trips than it would save.
 
+It does the same for **large reads**. A giant `package-lock.json` or a
+3,000-line source file is collapsed to a structured preview — a value-folded
+JSON/YAML summary, or a **signature outline** of the code (imports +
+class/function/method signatures, bodies elided) — with the full content one
+`jq` / `Read`-range away. Files the agent skims once then no longer get re-sent
+in full on every later turn.
+
 ## How much it saves
 
 > **Across 10 real commands on a production monorepo, raw output totaled
@@ -56,6 +63,13 @@ more in extra round-trips than it would save.
 from representative logs. Token estimate ≈ bytes ÷ 4. Methodology in
 [Benchmark](#benchmark). Research notes in
 [Token savings research](docs/token-savings-research.md).</sub>
+
+> **Large reads collapse too.** A real 3,196-line Python source file
+> (`~33,900` tok) becomes a `164`-symbol outline of `~2,700` tok — **−92%** —
+> with every body one `Read offset=…` away. Large `*.json`/`*.yaml` reads fold
+> the same way (a real `package-lock.json`: `~299,000` → `~660` tok, **−99.8%**).
+> Like logs, a file the agent reads early is re-sent on every later turn, so
+> these savings compound across the session too.
 
 ### Bottom line for an average dev
 
