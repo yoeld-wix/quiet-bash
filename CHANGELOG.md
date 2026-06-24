@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.15.2] — 2026-06-24
+
+### Changed
+- **Hook latency ~2× lower (~80 ms → ~40 ms per result), identical output.**
+  `quiet_prune` no longer scans the log dir on every invocation — it is
+  throttled behind a single-file stamp (`QUIET_PRUNE_INTERVAL_MINUTES`, default
+  5), turning a ~40 ms `find` into a ~1 ms stat on the common path. The Claude
+  Code result adapter now extracts shape/tool/path/text in one `jq` pass instead
+  of 3–4 subprocesses. Both are behaviour-preserving — the full test suite (every
+  outline/collapse/passthrough assertion) is unchanged; only timing and the
+  cleanup cadence of stale temp logs differ.
+
 ## [1.15.1] — 2026-06-24
 
 ### Fixed

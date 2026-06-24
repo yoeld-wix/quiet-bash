@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.15.1-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.15.2-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">

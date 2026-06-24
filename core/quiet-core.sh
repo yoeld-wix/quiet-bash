@@ -20,6 +20,7 @@
 : "${QUIET_INLINE_LINE_LIMIT:=60}"       # git output up to this many lines shown inline
 : "${QUIET_FAIL_TAIL_LINES:=40}"         # lines of a failed command's log to surface
 : "${QUIET_LOG_RETENTION_MINUTES:=1440}" # prune redirect logs older than this (24h)
+: "${QUIET_PRUNE_INTERVAL_MINUTES:=5}"   # at most one prune scan per this many minutes
 : "${QUIET_JSON_MIN_BYTES:=25000}"       # summarize *.json dumps larger than this
 : "${QUIET_RESULT_MIN_BYTES:=${QUIET_MCP_MIN_BYTES:-25000}}" # summarize tool results larger than this
 : "${QUIET_OUTLINE_MIN_BYTES:=30000}"    # outline source files larger than this
@@ -30,7 +31,17 @@ QUIET_CORE_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)
 
 # ── Prune stale redirect logs ────────────────────────────────────────────────
 quiet_prune() {
+  # Throttle: a full dir scan on every hook invocation costs ~40ms. Skip it if we
+  # pruned within the last QUIET_PRUNE_INTERVAL_MINUTES (a single-file stat, ~1ms).
+  # Behaviour is unchanged — stale logs are still deleted, just checked less often.
+  local stamp="${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}prune-stamp"
+  if [ -e "$stamp" ] \
+     && [ -z "$(find "$stamp" -mmin "+${QUIET_PRUNE_INTERVAL_MINUTES}" 2>/dev/null)" ]; then
+    return 0   # pruned recently → skip the full scan
+  fi
+  : > "$stamp" 2>/dev/null || true   # mark prune time (mtime = now)
   find "$QUIET_LOG_DIR" -maxdepth 1 -type f -name "${QUIET_LOG_PREFIX}*" \
+    ! -name "${QUIET_LOG_PREFIX}prune-stamp" \
     -mmin "+${QUIET_LOG_RETENTION_MINUTES}" -delete 2>/dev/null || true
 }
 

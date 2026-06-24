@@ -23,22 +23,24 @@ quiet_prune
 
 input=$(cat)
 
-# Classify the result shape so the replacement can mirror it.
-shape=$(printf '%s' "$input" | jq -r '
-  .tool_response
-  | if type=="string" then "string"
-    elif (type=="object" and (.content|type)=="array") then "content"
-    else "other" end' 2>/dev/null)
+# Extract shape, tool, path, and text in ONE jq pass (one subprocess instead of
+# 3-4). shape/tool/path are single-line and come first; text may be multiline so
+# it is last — read the first three lines, then slurp the rest as text.
+meta=$(printf '%s' "$input" | jq -r '
+  (.tool_response | if type=="string" then "string"
+     elif (type=="object" and ((.content|type)=="array")) then "content"
+     else "other" end),
+  (.tool_name // "tool"),
+  (.tool_input.path // .tool_input.file_path // ""),
+  (.tool_response | if type=="string" then .
+     else ((.content // []) | map(select(.type=="text") | .text) | join("\n")) end)
+' 2>/dev/null)
+{ IFS= read -r shape; IFS= read -r tool; IFS= read -r path; text=$(cat); } <<EOF
+$meta
+EOF
+
 [ "$shape" = "other" ] && exit 0   # unknown shape → leave it alone
-
-# Pull the textual payload.
-text=$(printf '%s' "$input" | jq -r '
-  .tool_response
-  | if type=="string" then .
-    else (.content | map(select(.type=="text") | .text) | join("\n")) end' 2>/dev/null)
-[ -z "$text" ] && exit 0            # nothing textual (image/audio/empty)
-
-tool=$(printf '%s' "$input" | jq -r '.tool_name // "tool"')
+[ -z "$text" ] && exit 0           # nothing textual (image/audio/empty)
 
 summary=""
 obytes=$(printf '%s' "$text" | wc -c | tr -d ' ')
@@ -47,7 +49,6 @@ if [ "$tool" = "Read" ]; then
   # Native Read: outline a large SOURCE file; pass anything else through untouched
   # (don't head/tail arbitrary large reads — the agent asked for that content).
   if [ "$obytes" -gt "${QUIET_OUTLINE_MIN_BYTES}" ]; then
-    path=$(printf '%s' "$input" | jq -r '.tool_input.path // .tool_input.file_path // empty' 2>/dev/null)
     if [ -n "$path" ] && [ -f "$path" ]; then
       case "${path##*.}" in
         py|js|mjs|cjs|jsx|ts|tsx|go|rs|java|kt|kts|scala|rb|c|h|cc|cpp|cxx|hpp|php|swift)

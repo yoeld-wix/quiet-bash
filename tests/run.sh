@@ -308,5 +308,12 @@ jq -e '.hooks.PostToolUse[]?.matcher | select(test("(^|\\|)Read($|\\|)"))' "$HJ"
   && pass "hooks.json PostToolUse matcher includes Read" || bad "PostToolUse matcher missing Read"
 rm -rf "$OT"
 
+echo "== quiet_prune throttle =="
+PD=$(mktemp -d)
+( QUIET_LOG_DIR="$PD"; quiet_prune; [ -f "$PD/${QUIET_LOG_PREFIX}prune-stamp" ]; ) \
+  && pass "quiet_prune writes a throttle stamp" || bad "quiet_prune stamp missing"
+( QUIET_LOG_DIR="$PD"; quiet_prune ) && pass "quiet_prune second call ok (throttled)" || bad "quiet_prune second call"
+rm -rf "$PD"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
