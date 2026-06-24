@@ -10,8 +10,9 @@
 # QUIET_OUTLINE_MIN_SYMBOLS symbols are found, or the extension is not a known
 # source type, it `exec cat`s the file so the caller's normal handling applies.
 #
-# Symbol start-lines come from `grep -nE` (reliable ERE); body ranges + render
-# are an awk pass over the file (no dynamic awk regex; bash-3.2 safe).
+# Matching + body ranges + render are a SINGLE awk pass over the file (no
+# grep/cut/tr pipeline — ~4x faster). The per-language regexes are passed via
+# ENVIRON (not -v) so awk does not mangle backslash escapes in complex patterns.
 
 QODIR="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$QODIR/quiet-core.sh"
@@ -47,51 +48,38 @@ case "$ext" in
   *) exec cat "$f" ;;   # not a known source extension → leave it
 esac
 
-# Enforce byte threshold: pass through small files
-[ "$(wc -c <"$f" 2>/dev/null || echo 0)" -lt "${QUIET_OUTLINE_MIN_BYTES}" ] && exec cat "$f"
+# Enforce byte threshold: pass through small files (one wc, reused for header).
+bytes=$(wc -c <"$f" 2>/dev/null || echo 0)
+[ "$bytes" -lt "${QUIET_OUTLINE_MIN_BYTES}" ] && exec cat "$f"
 
 import_re='^[[:space:]]*(import|from|#include|use|require|using|package)([[:space:]]|\()'
 
-sym_lines=$(grep -nE "$sig" "$f" 2>/dev/null | cut -d: -f1 | tr '\n' ' ')
-imp_lines=$(grep -nE "$import_re" "$f" 2>/dev/null | cut -d: -f1 | tr '\n' ' ')
-n=$(printf '%s' "$sym_lines" | wc -w | tr -d ' ')
-[ "$n" -lt "${QUIET_OUTLINE_MIN_SYMBOLS}" ] && exec cat "$f"
-
-out=$(awk -v syms="$sym_lines" -v imps="$imp_lines" -v minsym="${QUIET_OUTLINE_MIN_SYMBOLS}" '
-BEGIN{
-  ns=split(syms, SA, " "); cnt=0
-  for(i=1;i<=ns;i++) if(SA[i]!=""){ cnt++; order[cnt]=SA[i]+0 }
-  ni=split(imps, IA, " ")
-  for(i=1;i<=ni;i++) if(IA[i]!=""){ if(!ifirst) ifirst=IA[i]+0; ilast=IA[i]+0 }
-}
-{ L[NR]=$0 }
+# Single awk pass: match signatures + imports (regexes via ENVIRON to preserve
+# backslash escapes), compute body ranges, and render the full outline. awk
+# exits 3 when below the symbol floor → fall back to cat.
+out=$(QUIET_SIG="$sig" QUIET_IMP="$import_re" awk \
+  -v lang="$lang" -v base="$base" -v path="$f" -v bytes="$bytes" \
+  -v minsym="${QUIET_OUTLINE_MIN_SYMBOLS}" '
+BEGIN{ sig=ENVIRON["QUIET_SIG"]; imp=ENVIRON["QUIET_IMP"] }
+$0 ~ sig { si[++n]=NR; st[n]=$0 }
+$0 ~ imp { if(!ifirst) ifirst=NR; ilast=NR }
 END{
   total=NR
-  if(cnt<minsym){ print "@@FALLBACK@@"; exit }
+  if(n<minsym) exit 3
+  printf "[quiet-bash] %s - %d lines / %d bytes of %s - outline (bodies elided; expand: Read %s offset=<start> limit=<n>)\n", base, total, bytes, lang, path
   if(ifirst) printf "%6d  imports ... (lines %d-%d)\n", ifirst, ifirst, ilast
-  for(k=1;k<=cnt;k++){
-    s=order[k]; e=(k<cnt ? order[k+1]-1 : total)
-    t=L[s]; sub(/[[:space:]]+$/,"",t)
+  es=1; ee=1
+  for(k=1;k<=n;k++){
+    s=si[k]; e=(k<n ? si[k+1]-1 : total)
+    t=st[k]; sub(/[[:space:]]+$/,"",t)
     if(length(t)>200) t=substr(t,1,200) "..."
     printf "%6d  %s   body %d-%d\n", s, t, s, e
+    if(k==1){ es=s; ee=e }
   }
-  printf "@@META@@ %d %d\n", cnt, total
+  en=ee-es+1; if(en<1) en=1
+  printf "  [%d symbols - full body: Read %s offset=%d limit=%d - raw: sed -n %d,%dp %s]\n", n, path, es, en, es, ee, path
 }' "$f")
+ast=$?
 
-case "$out" in *"@@FALLBACK@@"*) exec cat "$f" ;; esac
-
-meta=$(printf '%s\n' "$out" | sed -n 's/^@@META@@ //p')
-n=${meta%% *}; total=${meta##* }
-body=$(printf '%s\n' "$out" | grep -v '^@@META@@')
-bytes=$(wc -c <"$f" | tr -d ' ')
-
-first=$(printf '%s\n' "$body" | sed -n 's/.*body \([0-9]*\)-\([0-9]*\)$/\1 \2/p' | head -1)
-# shellcheck disable=SC2086
-set -- $first
-es="${1:-1}"; ee="${2:-1}"; en=$((ee-es+1))
-
-printf '[quiet-bash] %s - %d lines / %d bytes of %s - outline (bodies elided; expand: Read %s offset=<start> limit=<n>)\n' \
-  "$base" "$total" "$bytes" "$lang" "$f"
-printf '%s\n' "$body"
-printf '  [%d symbols - full body: Read %s offset=%d limit=%d - raw: sed -n %d,%dp %s]\n' \
-  "$n" "$f" "$es" "$en" "$es" "$ee" "$f"
+{ [ "$ast" -eq 3 ] || [ -z "$out" ]; } && exec cat "$f"
+printf '%s\n' "$out"

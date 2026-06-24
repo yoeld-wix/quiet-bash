@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Quiets noisy command output (builds, tests, big git diffs) so it doesn't fill the agent's context window.",
-    "version": "1.16.1"
+    "version": "1.16.2"
   },
   "plugins": [
     {
       "name": "quiet-bash",
       "description": "Pre-exec hook + universal shell wrapper that redirects verbose command output to a temp log and leaves a one-line summary.",
-      "version": "1.16.1",
+      "version": "1.16.2",
       "source": "."
     }
   ]

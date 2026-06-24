@@ -115,14 +115,28 @@ same ranges). Benchmarked vs the shell grep+awk pipeline:
 | 135 KB real `.py` (164 sym) | 94.6 ms | 8.5 ms | **11.1×** |
 | 860 KB huge `.py` (20k sym) | 316.3 ms | 19.4 ms | **16.3×** |
 
-**Conclusion:** compiled is genuinely ~11–16× faster on the outliner (the one
-compute-bound path) — but the absolute saving (~85–300 ms, on the infrequent
-large-source-read path) is invisible against the multi-second LLM turn, and a
-compiled binary would cost the zero-dep / drop-in / auditable-shell identity
-(per-platform builds + release pipeline + binary trust). Verdict: keep shell as
-the default. If ever wanted, ship a compiled binary as an **optional accelerator**
-(use-if-present, shell fallback), like the ctags/tree-sitter ladder. NOT for the
-hook dispatch — that was fork-bound and already fixed in shell (v1.16.1).
+**Full 5-way shootout (measured 2026-06-24, Rust toolchain installed):**
+
+| Impl | 135 KB | 860 KB | Notes |
+|---|---|---|---|
+| shell grep+awk (was current) | 80 ms | 376 ms | ~7 procs, reads file 3× |
+| **shell pure single-awk** | **18.9 ms (4.2×)** | **103.6 ms (3.6×)** | one awk pass, zero-dep |
+| C (clang) | 10.3 ms | 36.9 ms | tiny startup, slow POSIX regex |
+| Go | 11.4 ms | 26.3 ms | RE2 regex + GC-runtime startup |
+| **Rust** | **6.3 ms (12.6×)** | **13.8 ms (27.3×)** | fastest; 453 KB binary (vs Go 2.9 MB) |
+
+Rust is the absolute winner (small startup + fast regex). But the absolute saving
+is invisible vs the multi-second LLM turn, and a binary costs the zero-dep /
+auditable-shell identity. **Accumulation check:** the outliner only fires on large
+source reads (~a few/session) → ~70 ms/session, negligible. A *full* Rust hook
+rewrite (every-call path) would save ~6 s across a 200-call session ≈ ~1% of
+session wall-clock — real but imperceptible, for the price of per-platform builds.
+
+**Decision (shipped v1.16.2):** convert `quiet-outline.sh` to the **pure single-awk**
+pass — the free zero-dep win. Production result: 80→45 ms (135 KB), 376→159 ms
+(860 KB), behaviour identical. Compiled stays rejected as default; a use-if-present
+Rust accelerator remains a possible future opt-in. NOT for the hook dispatch —
+that was fork-bound and already fixed in shell (v1.16.1).
 
 ## C. Cost-saving survey — ❌ NO DATA (re-run needed)
 

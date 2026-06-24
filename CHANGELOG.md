@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.16.2] — 2026-06-24
+
+### Changed
+- **Source outliner ~2× faster (single awk pass), behaviour identical.**
+  `core/quiet-outline.sh` replaced its `grep -nE | cut | tr` + separate-awk
+  pipeline (≈7 processes, file read 3×) with one awk pass that matches, ranges,
+  and renders in a single read. Per-language regexes are passed via `ENVIRON`
+  (not `-v`) so complex patterns (JS/C) aren't escape-mangled. Production result:
+  80→45 ms (135 KB), 376→159 ms (860 KB). All 11 per-language outline tests
+  unchanged. (A 5-way shootout — incl. Go and Rust — is recorded in
+  `docs/speed-research-findings.md`; compiled is faster still but rejected as
+  default to keep the zero-dependency shell design.)
+
 ## [1.16.1] — 2026-06-24
 
 ### Changed
