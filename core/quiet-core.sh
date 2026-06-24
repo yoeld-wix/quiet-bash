@@ -78,7 +78,7 @@ quiet_run() {
     echo "[ok: exit 0 — ${ln} lines hidden in ${log}; grep/tail it only if you need details]"
   else
     echo "[FAILED: exit ${st} — ${ln} lines in ${log} | last ${QUIET_FAIL_TAIL_LINES} below; grep that file for the rest]"
-    tail -n "${QUIET_FAIL_TAIL_LINES}" "$log"
+    "$QUIET_CORE_DIR/quiet-tail.sh" "$log" "${QUIET_FAIL_TAIL_LINES}" 2>/dev/null || tail -n "${QUIET_FAIL_TAIL_LINES}" "$log"
   fi
   return "$st"
 }
@@ -96,7 +96,7 @@ if [ "\$__st" -eq 0 ]; then
   echo "[ok: exit 0 — \$__ln lines hidden in \$__log; grep/tail it only if you need details]"
 else
   echo "[FAILED: exit \$__st — \$__ln lines in \$__log | last ${QUIET_FAIL_TAIL_LINES} below; grep that file for the rest]"
-  tail -n ${QUIET_FAIL_TAIL_LINES} "\$__log"
+  "${QUIET_CORE_DIR}/quiet-tail.sh" "\$__log" ${QUIET_FAIL_TAIL_LINES} 2>/dev/null || tail -n ${QUIET_FAIL_TAIL_LINES} "\$__log"
 fi
 exit \$__st
 WRAP
@@ -113,7 +113,7 @@ __st=\$?
 __ln=\$(wc -l <"\$__log" | tr -d ' ')
 if [ "\$__st" -ne 0 ]; then
   echo "[git FAILED: exit \$__st — \$__ln lines in \$__log | last ${QUIET_FAIL_TAIL_LINES} below]"
-  tail -n ${QUIET_FAIL_TAIL_LINES} "\$__log"
+  "${QUIET_CORE_DIR}/quiet-tail.sh" "\$__log" ${QUIET_FAIL_TAIL_LINES} 2>/dev/null || tail -n ${QUIET_FAIL_TAIL_LINES} "\$__log"
 elif [ "\$__ln" -le ${QUIET_INLINE_LINE_LIMIT} ]; then
   cat "\$__log"
 else

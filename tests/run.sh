@@ -308,6 +308,23 @@ jq -e '.hooks.PostToolUse[]?.matcher | select(test("(^|\\|)Read($|\\|)"))' "$HJ"
   && pass "hooks.json PostToolUse matcher includes Read" || bad "PostToolUse matcher missing Read"
 rm -rf "$OT"
 
+echo "== quiet-tail (ANSI strip / progress collapse / dup fold) =="
+QT="$ROOT/core/quiet-tail.sh"
+TT=$(mktemp -d); lf="$TT/log"
+printf 'starting build\n\033[31mERROR:\033[0m boom\nDownloading [..  ]\rDownloading [....]\rDownloading [done]\nsame line\nsame line\nsame line\ntail end\n' > "$lf"
+before=$(wc -c <"$lf" | tr -d ' ')
+out=$("$QT" "$lf" 40)
+printf '%s' "$out" | grep -q '\033' && bad "quiet-tail leaves ANSI codes" || pass "quiet-tail strips ANSI"
+printf '%s' "$out" | grep -q 'ERROR: boom' && pass "quiet-tail keeps error text" || bad "quiet-tail dropped error text"
+printf '%s' "$out" | grep -q 'Downloading \[done\]' && ! printf '%s' "$out" | grep -q 'Downloading \[\.\.' \
+  && pass "quiet-tail collapses \\r progress to final state" || bad "quiet-tail progress collapse"
+printf '%s' "$out" | grep -qE 'same line  \(x3\)' && pass "quiet-tail folds consecutive duplicates" || bad "quiet-tail dup fold"
+# the log on disk must be untouched (byte-exact before vs after)
+[ "$(wc -c <"$lf" | tr -d ' ')" = "$before" ] && pass "quiet-tail leaves the log file untouched" || bad "quiet-tail modified the log"
+# missing file → empty, no crash
+[ -z "$("$QT" "$TT/nope" 40)" ] && pass "quiet-tail missing file → empty" || bad "quiet-tail missing file"
+rm -rf "$TT"
+
 echo "== quiet_prune throttle =="
 PD=$(mktemp -d)
 ( QUIET_LOG_DIR="$PD"; quiet_prune; [ -f "$PD/${QUIET_LOG_PREFIX}prune-stamp" ]; ) \

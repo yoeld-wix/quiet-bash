@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.16.0] — 2026-06-24
+
+### Added
+- **Cleaner failure tails (`core/quiet-tail.sh`).** When a quieted command fails,
+  the surfaced tail is now run through three lossless transforms before the agent
+  sees it: ANSI/SGR escape codes stripped, carriage-return progress bars collapsed
+  to their final state, and runs of identical consecutive lines folded to
+  `<line>  (xN)`. Cuts the noise that build/test tools (docker, npm, webpack,
+  pip) emit, so the failure preview is both smaller and more readable. The full
+  log on disk is never modified, and every call falls back to plain `tail` if the
+  helper is unavailable, so failure display can never break. Wired into all three
+  failure-surfacing paths (`quiet_run` + the Bash and git wrap generators).
+
 ## [1.15.2] — 2026-06-24
 
 ### Changed

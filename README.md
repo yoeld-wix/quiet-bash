@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.15.2-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.16.0-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
@@ -32,7 +32,10 @@ When the agent runs a known-verbose command — a test run, a build, a buildkite
 invocation, a `docker build`, a `bazel build/test`, or a big `git diff` — the
 full output is redirected to a temp log file and the agent only sees a short
 summary. On failure it still gets the tail of the log (and a pointer to grep
-the rest), so nothing important is lost.
+the rest), so nothing important is lost — and that surfaced tail is cleaned
+first: ANSI colors stripped, carriage-return progress bars collapsed to their
+final state, and repeated lines folded to `(xN)`, so the failure preview stays
+small and readable.
 
 Short, quick commands are passed through untouched: wrapping them would cost
 more in extra round-trips than it would save.
