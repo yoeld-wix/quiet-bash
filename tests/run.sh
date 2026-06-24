@@ -308,6 +308,17 @@ jq -e '.hooks.PostToolUse[]?.matcher | select(test("(^|\\|)Read($|\\|)"))' "$HJ"
   && pass "hooks.json PostToolUse matcher includes Read" || bad "PostToolUse matcher missing Read"
 rm -rf "$OT"
 
+echo "== quiet_rewrite edge cases (builtin-regex conversion) =="
+ED=$(mktemp -d)
+python3 -c "import json,sys; open(sys.argv[1],'w').write(json.dumps({'a':list(range(8000))}))" "$ED/big.json" 2>/dev/null \
+  || { printf '{"a":['; for i in $(seq 1 8000); do printf '%d,' "$i"; done; printf '0]}'; } > "$ED/big.json"
+quiet_rewrite "git diff | head" >/dev/null && bad "piped git should pass through" || pass "piped git passes through ([|] literal)"
+quiet_rewrite "git diff --stat" >/dev/null && bad "git --stat should pass through" || pass "git --stat passes through"
+quiet_rewrite "git diff" >/dev/null && pass "git diff still wraps" || bad "git diff should wrap"
+{ quiet_rewrite "jq . $ED/big.json" | grep -q quiet-json.sh; } && pass "jq . big.json routes to quiet-json" || bad "jq . routing"
+{ quiet_rewrite "cat $ED/big.json" | grep -q quiet-json.sh; } && pass "cat big.json routes to quiet-json" || bad "cat json routing"
+rm -rf "$ED"
+
 echo "== quiet-tail (ANSI strip / progress collapse / dup fold) =="
 QT="$ROOT/core/quiet-tail.sh"
 TT=$(mktemp -d); lf="$TT/log"

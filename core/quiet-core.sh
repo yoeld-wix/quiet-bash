@@ -162,54 +162,56 @@ quiet_rewrite() {
     *__log=* | *"${QUIET_LOG_PREFIX}"* | *quiet-json.sh* | *quiet-outline.sh*) return 1 ;;
   esac
 
+  # All matching below uses the builtin `[[ =~ ]]` (ERE, identical to grep -E)
+  # so the common non-matching command forks ZERO subprocesses. The two file
+  # extractions still use one grep each, but only after a builtin pre-check
+  # confirms a candidate is plausible — so they never run on a typical command.
+  local read_re='(^|[[:space:];&|(])(cat|bat|less|more|head|tail)[[:space:]]'
+  local jqyq_re="(^|[[:space:];&|(])(jq|yq)[[:space:]]+(-[A-Za-z=]+[[:space:]]+)*('\\.'|\\.)([[:space:]]|$)"
+
   # ── JSON/YAML read optimization: summarize a large structured-data dump ──
   # Only plain reads (cat/bat/less/more/head/tail or `jq .`/`yq .`) of a single
   # large .json/.yaml/.yml file — never a piped/redirected command or a
-  # projection (those already narrow the output, so leave them alone). YAML is
-  # handled when a converter (ruby / python3 / yq) is present; else passes through.
-  case "$cmd" in
-    *'|'* | *'>'*) : ;;  # piped/redirected → skip
-    *)
-      local jfile
-      jfile=$(printf '%s' "$cmd" | grep -oE '[^[:space:]]+\.(json|ya?ml)' | head -1)
-      if [ -n "$jfile" ] && [ -f "$jfile" ] \
-         && [ "$(wc -c <"$jfile" 2>/dev/null || echo 0)" -gt "${QUIET_JSON_MIN_BYTES}" ]; then
-        local ok=0
-        case "$jfile" in
-          *.json) ok=1 ;;
-          # YAML needs a converter — ruby (macOS default) / python3 / yq
-          *) { command -v ruby >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 || command -v yq >/dev/null 2>&1; } && ok=1 ;;
-        esac
-        if [ "$ok" = 1 ] \
-           && { printf '%s' "$cmd" | grep -qE '(^|[[:space:];&|(])(cat|bat|less|more|head|tail)[[:space:]]' \
-                || printf '%s' "$cmd" | grep -qE "(^|[[:space:];&|(])(jq|yq)[[:space:]]+(-[A-Za-z=]+[[:space:]]+)*('\\.'|\\.)([[:space:]]|\$)"; }; then
-          printf '%q %q' "${QUIET_CORE_DIR}/quiet-json.sh" "$jfile"
-          return 0
-        fi
-      fi
-      ;;
-  esac
-
-  # ── Source-file outline: large code file read → signature skeleton ──
-  case "$cmd" in
-    *'|'* | *'>'*) : ;;   # piped/redirected → skip
-    *)
-      local sfile
-      sfile=$(printf '%s' "$cmd" | grep -oE '[^[:space:]]+\.(py|js|mjs|cjs|jsx|ts|tsx|go|rs|java|kt|kts|scala|rb|c|h|cc|cpp|cxx|hpp|php|swift)' | head -1)
-      if [ -n "$sfile" ] && [ -f "$sfile" ] \
-         && [ "$(wc -c <"$sfile" 2>/dev/null || echo 0)" -gt "${QUIET_OUTLINE_MIN_BYTES}" ] \
-         && printf '%s' "$cmd" | grep -qE '(^|[[:space:];&|(])(cat|bat|less|more|head|tail)[[:space:]]'; then
-        printf '%q %q' "${QUIET_CORE_DIR}/quiet-outline.sh" "$sfile"
+  # projection. YAML handled when a converter (ruby / python3 / yq) is present.
+  if [[ $cmd != *'|'* && $cmd != *'>'* ]] \
+     && [[ $cmd =~ [^[:space:]]+\.(json|ya?ml) ]] \
+     && { [[ $cmd =~ $read_re ]] || [[ $cmd =~ $jqyq_re ]]; }; then
+    local jfile
+    jfile=$(printf '%s' "$cmd" | grep -oE '[^[:space:]]+\.(json|ya?ml)' | head -1)
+    if [ -n "$jfile" ] && [ -f "$jfile" ] \
+       && [ "$(wc -c <"$jfile" 2>/dev/null || echo 0)" -gt "${QUIET_JSON_MIN_BYTES}" ]; then
+      local ok=0
+      case "$jfile" in
+        *.json) ok=1 ;;
+        # YAML needs a converter — ruby (macOS default) / python3 / yq
+        *) { command -v ruby >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 || command -v yq >/dev/null 2>&1; } && ok=1 ;;
+      esac
+      if [ "$ok" = 1 ]; then
+        printf '%q %q' "${QUIET_CORE_DIR}/quiet-json.sh" "$jfile"
         return 0
       fi
-      ;;
-  esac
+    fi
+  fi
+
+  # ── Source-file outline: large code file read → signature skeleton ──
+  local src_token_re='[^[:space:]]+\.(py|js|mjs|cjs|jsx|ts|tsx|go|rs|java|kt|kts|scala|rb|c|h|cc|cpp|cxx|hpp|php|swift)'
+  if [[ $cmd != *'|'* && $cmd != *'>'* ]] \
+     && [[ $cmd =~ $src_token_re ]] && [[ $cmd =~ $read_re ]]; then
+    local sfile
+    sfile=$(printf '%s' "$cmd" | grep -oE "$src_token_re" | head -1)
+    if [ -n "$sfile" ] && [ -f "$sfile" ] \
+       && [ "$(wc -c <"$sfile" 2>/dev/null || echo 0)" -gt "${QUIET_OUTLINE_MIN_BYTES}" ]; then
+      printf '%q %q' "${QUIET_CORE_DIR}/quiet-outline.sh" "$sfile"
+      return 0
+    fi
+  fi
 
   # ── git path: diff/show/log have unbounded output but CONTENT matters ──
   local git_re='(^|[[:space:];&|(])git[[:space:]]+(diff|show|log)([[:space:]]|$)'
   # Skip if the command already bounds its own output (flag, pipe, or redirect).
-  local limited_re='[-][-](stat|shortstat|numstat|name-only|name-status|oneline)|\|[[:space:]]*(head|tail|wc|grep|sed|awk)|>'
-  if printf '%s' "$cmd" | grep -qE "$git_re" && ! printf '%s' "$cmd" | grep -qE "$limited_re"; then
+  # `[|]` is an unambiguous literal pipe in both grep -E and bash ERE.
+  local limited_re='[-][-](stat|shortstat|numstat|name-only|name-status|oneline)|[|][[:space:]]*(head|tail|wc|grep|sed|awk)|>'
+  if [[ $cmd =~ $git_re ]] && ! [[ $cmd =~ $limited_re ]]; then
     local summary
     summary=$(printf '%s' "$cmd" | sed -E \
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)diff/\1git\2diff --stat/' \
@@ -236,7 +238,7 @@ quiet_rewrite() {
   managed="${managed}|bk([[:space:]]|$)|buildkite"
   local verbose_re="${pre}(${always}|${managed})"
 
-  if printf '%s' "$cmd" | grep -qE "$verbose_re"; then
+  if [[ $cmd =~ $verbose_re ]]; then
     _quiet_wrap_generic "$cmd"
     return 0
   fi

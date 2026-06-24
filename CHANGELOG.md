@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.16.1] — 2026-06-24
+
+### Changed
+- **PreToolUse Bash hook ~2× faster (~69 ms → ~30 ms), behaviour identical.**
+  `quiet_rewrite` replaced its 8 `printf | grep -qE` pipe-forks with builtin
+  `[[ =~ ]]` ERE matches (same regexes), and gates the two file-extraction greps
+  behind a builtin pre-check — so a typical non-matching command now forks **zero**
+  subprocesses in the decision path (29.2 ms → 0.44 ms per `quiet_rewrite` call).
+  The result adapter also skips the `jq` parse entirely when the whole raw event
+  is already below the size threshold. Full test suite unchanged + new edge tests
+  (piped-git pass-through, `jq .` routing) lock the conversion.
+
 ## [1.16.0] — 2026-06-24
 
 ### Added

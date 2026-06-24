@@ -23,6 +23,11 @@ quiet_prune
 
 input=$(cat)
 
+# Fast path: if the whole raw event is already small, the extracted result text
+# is too (the event only wraps it), so there is nothing to shrink — skip the jq
+# parse entirely. The threshold is the smallest one that could trigger an action.
+[ "$(printf '%s' "$input" | wc -c | tr -d ' ')" -le "${QUIET_RESULT_MIN_BYTES}" ] && exit 0
+
 # Extract shape, tool, path, and text in ONE jq pass (one subprocess instead of
 # 3-4). shape/tool/path are single-line and come first; text may be multiline so
 # it is last — read the first three lines, then slurp the rest as text.
