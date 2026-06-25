@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 360" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif">
+  <rect width="820" height="360" rx="14" fill="#0f172a"/>
+  <!-- header -->
+  <text x="40" y="52" fill="#f1f5f9" font-size="26" font-weight="700">Faster <tspan fill="#1fb588">and</tspan> cheaper — measured</text>
+  <text x="40" y="78" fill="#94a3b8" font-size="14">Output-side levers on a coding turn · subagent A/B (n=5) · no correctness regression</text>
+
+  <!-- big stats -->
+  <g>
+    <text x="40" y="146" fill="#e8836b" font-size="44" font-weight="800">−49%</text>
+    <text x="42" y="170" fill="#94a3b8" font-size="13">response time</text>
+    <text x="300" y="146" fill="#e8836b" font-size="44" font-weight="800">−45%</text>
+    <text x="302" y="170" fill="#94a3b8" font-size="13">code written</text>
+    <text x="560" y="146" fill="#e8836b" font-size="44" font-weight="800">−16%</text>
+    <text x="562" y="170" fill="#94a3b8" font-size="13">total tokens</text>
+  </g>
+
+  <line x1="40" y1="196" x2="780" y2="196" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- bar chart: baseline vs stacked -->
+  <!-- row 1: wall-clock -->
+  <text x="40" y="236" fill="#cbd5e1" font-size="14" font-weight="600">Wall-clock</text>
+  <rect x="150" y="222" width="560" height="20" rx="5" fill="#334155"/>
+  <text x="718" y="237" fill="#64748b" font-size="13">28.8s</text>
+  <rect x="150" y="248" width="284" height="20" rx="5" fill="#1fb588"/>
+  <text x="442" y="263" fill="#1fb588" font-size="13" font-weight="700">14.6s</text>
+
+  <!-- row 2: tokens -->
+  <text x="40" y="312" fill="#cbd5e1" font-size="14" font-weight="600">Tokens</text>
+  <rect x="150" y="298" width="560" height="20" rx="5" fill="#334155"/>
+  <text x="718" y="313" fill="#64748b" font-size="13">23.4k</text>
+  <rect x="150" y="324" width="469" height="20" rx="5" fill="#1fb588"/>
+  <text x="627" y="339" fill="#1fb588" font-size="13" font-weight="700">19.6k</text>
+
+  <!-- legend -->
+  <rect x="150" y="196" width="0" height="0"/>
+  <g font-size="12">
+    <rect x="560" y="206" width="12" height="12" rx="2" fill="#334155"/>
+    <text x="578" y="216" fill="#64748b">baseline</text>
+    <rect x="648" y="206" width="12" height="12" rx="2" fill="#1fb588"/>
+    <text x="666" y="216" fill="#94a3b8">+ quiet-bash stack</text>
+  </g>
+</svg>

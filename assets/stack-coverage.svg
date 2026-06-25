@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 220" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif">
+  <rect width="820" height="220" rx="14" fill="#0f172a"/>
+  <text x="40" y="48" fill="#f1f5f9" font-size="24" font-weight="700">Both halves of the bill — and they stack</text>
+
+  <!-- the cost bar, split input | output -->
+  <rect x="40" y="80" width="370" height="70" rx="8" fill="#1fb588"/>
+  <rect x="416" y="80" width="364" height="70" rx="8" fill="#2b3a55"/>
+
+  <!-- input half -->
+  <text x="60" y="110" fill="#04261c" font-size="16" font-weight="800">INPUT</text>
+  <text x="60" y="132" fill="#04382a" font-size="12.5">quiet-bash hooks · mechanical · lossless</text>
+
+  <!-- output half -->
+  <text x="436" y="110" fill="#e8836b" font-size="16" font-weight="800">OUTPUT</text>
+  <text x="436" y="132" fill="#cbd5e1" font-size="12.5">Concise + minimal-change · or ponytail · behavioral</text>
+
+  <!-- captions -->
+  <text x="60" y="174" fill="#94a3b8" font-size="12">command output · file reads · gh logs · listings · curl</text>
+  <text x="436" y="174" fill="#94a3b8" font-size="12">prose generated · code written</text>
+
+  <text x="40" y="202" fill="#64748b" font-size="12.5">Disjoint cost sources → run them together for full input + output coverage. Each is lossless or guardrailed — no regression.</text>
+</svg>

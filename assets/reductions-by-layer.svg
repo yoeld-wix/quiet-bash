@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 460" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif">
+  <rect width="860" height="460" rx="14" fill="#0f172a"/>
+  <text x="40" y="48" fill="#f1f5f9" font-size="24" font-weight="700">Reduction by layer — measured</text>
+  <text x="40" y="72" fill="#94a3b8" font-size="13.5">Per-operation input cuts (lossless) + output-side A/B (no regression). Bar = % reduction.</text>
+
+  <!-- INPUT group -->
+  <text x="40" y="108" fill="#1fb588" font-size="13" font-weight="800" letter-spacing="1">INPUT · per operation · lossless</text>
+
+  <g font-size="13" fill="#cbd5e1">
+    <text x="40" y="138">command output</text>
+    <text x="40" y="170">JSON read</text>
+    <text x="40" y="202">recursive listing</text>
+    <text x="40" y="234">source outline</text>
+  </g>
+  <g fill="#1fb588">
+    <rect x="210" y="126" width="599" height="18" rx="4"/>
+    <rect x="210" y="158" width="599" height="18" rx="4"/>
+    <rect x="210" y="190" width="588" height="18" rx="4"/>
+    <rect x="210" y="222" width="552" height="18" rx="4"/>
+  </g>
+  <g font-size="12.5" font-weight="700" fill="#0f172a">
+    <text x="770" y="139">-99.9%</text>
+    <text x="770" y="171">-99.8%</text>
+    <text x="762" y="203" fill="#f1f5f9">-98%</text>
+    <text x="726" y="235" fill="#f1f5f9">-92%</text>
+  </g>
+
+  <!-- OUTPUT group -->
+  <text x="40" y="288" fill="#e8836b" font-size="13" font-weight="800" letter-spacing="1">OUTPUT · subagent A/B · no regression</text>
+
+  <g font-size="13" fill="#cbd5e1">
+    <text x="40" y="318">response time (stacked)</text>
+    <text x="40" y="350">code written</text>
+    <text x="40" y="382">total tokens (stacked)</text>
+    <text x="40" y="414">response time (Concise only)</text>
+  </g>
+  <g fill="#e8836b">
+    <rect x="210" y="306" width="294" height="18" rx="4"/>
+    <rect x="210" y="338" width="270" height="18" rx="4"/>
+    <rect x="210" y="370" width="96" height="18" rx="4"/>
+    <rect x="210" y="402" width="60" height="18" rx="4"/>
+  </g>
+  <g font-size="12.5" font-weight="700" fill="#f1f5f9">
+    <text x="512" y="319">-49%</text>
+    <text x="488" y="351">-45%</text>
+    <text x="314" y="383">-16%</text>
+    <text x="278" y="415">-10%</text>
+  </g>
+
+  <text x="40" y="448" fill="#64748b" font-size="11.5">Input cuts are per-operation on the quieted output; output A/B is n=5 on a coding turn. Session-level is modeled, not shown.</text>
+</svg>

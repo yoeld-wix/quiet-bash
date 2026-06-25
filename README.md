@@ -7,11 +7,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.20.0-1fb588" alt="release">
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
-  <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
-  <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
-  <a href="https://github.com/yoeld-wix/quiet-bash/actions/workflows/ci.yml"><img src="https://github.com/yoeld-wix/quiet-bash/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
+  <img src="https://img.shields.io/github/stars/yoeld-wix/quiet-bash?style=flat-square&color=1fb588&label=stars" alt="stars">
+  <img src="https://img.shields.io/github/v/release/yoeld-wix/quiet-bash?style=flat-square&color=1fb588&label=release" alt="release">
+  <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588?style=flat-square" alt="works with 7 agents">
+  <img src="https://img.shields.io/badge/command%20output-99.9%25%20cut-e8836b?style=flat-square" alt="command output 99.9% cut">
+  <img src="https://img.shields.io/badge/license-MIT-1fb588?style=flat-square" alt="MIT license">
 </p>
 
 <p align="center">
@@ -48,6 +48,10 @@ class/function/method signatures, bodies elided) — with the full content one
 in full on every later turn.
 
 ## How much it saves
+
+<p align="center">
+  <img src="assets/reductions-by-layer.svg" alt="Reduction by layer: command output -99.9%, JSON -99.8%, listing -98%, source outline -92%; output side stacked -49% time, -45% code, -16% tokens" width="860">
+</p>
 
 > **Across 10 real commands on a production monorepo, raw output totaled
 > `536,957` tokens. quiet-bash replaced them with `~250` tokens of summaries —
@@ -126,6 +130,10 @@ failure it still surfaces the last 40 lines inline, and small `git diff`/`show`/
 
 ### Output side too — faster *and* cheaper (measured A/B)
 
+<p align="center">
+  <img src="assets/output-savings.svg" alt="Measured: −49% response time, −45% code, −16% tokens on a coding turn" width="820">
+</p>
+
 The hooks cut **input**. Two opt-in guidance pieces cut **output** — the half
 priced **3–5×** input and generated **serially** (the latency bottleneck).
 Measured in subagent A/Bs (N=5):
@@ -140,6 +148,10 @@ Measured in subagent A/Bs (N=5):
 session-level ~30% is **modeled** (no single end-to-end benchmark run yet).</sub>
 
 ### vs ponytail — they stack, not compete
+
+<p align="center">
+  <img src="assets/stack-coverage.svg" alt="quiet-bash covers the input half (mechanical, lossless); Concise + minimal-change or ponytail cover the output half — run them together" width="820">
+</p>
 
 | | quiet-bash | [ponytail](https://github.com/DietrichGebert/ponytail) |
 |---|---|---|
