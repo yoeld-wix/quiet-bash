@@ -402,5 +402,21 @@ else
   echo "  (skipped — node not available)"
 fi
 
+echo "== quiet-prompt (split: inline rules, spill [ref] reference) =="
+QPD=$(mktemp -d); pf="$QPD/p.md"
+{ echo "# A"; echo "## Rules"; echo "MANDATORY token X."; \
+  echo "## Big [ref]"; for i in $(seq 1 300); do echo "ref line $i padding padding padding"; done; } > "$pf"
+QP="$ROOT/core/quiet-prompt.sh"
+stub=$("$QP" "$pf")
+echo "$stub" | grep -q "MANDATORY token X." && pass "quiet-prompt keeps untagged rules inline" || bad "quiet-prompt dropped inline rules"
+{ ! echo "$stub" | grep -q "ref line 150"; } && pass "quiet-prompt spills [ref] body" || bad "quiet-prompt left [ref] body inline"
+echo "$stub" | grep -q "load a section when the task needs it" && pass "quiet-prompt emits load-on-demand pointer" || bad "quiet-prompt missing pointer"
+[ "$(printf '%s' "$stub" | wc -c)" -lt "$(wc -c <"$pf")" ] && pass "quiet-prompt stub smaller than prompt" || bad "quiet-prompt stub not smaller"
+"$QP" "$pf" --section "Big" | grep -q "ref line 1 " && pass "quiet-prompt --section loads spilled section" || bad "quiet-prompt --section failed"
+# safety: no [ref] tags -> pass through whole, no quieting
+nf="$QPD/n.md"; { echo "# N"; echo "## Rules"; for i in $(seq 1 300); do echo "rule line $i padding padding padding"; done; } > "$nf"
+[ "$("$QP" "$nf" | grep -c 'rule line')" -eq 300 ] && pass "quiet-prompt passes through when nothing tagged [ref]" || bad "quiet-prompt quieted untagged prompt"
+rm -rf "$QPD"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

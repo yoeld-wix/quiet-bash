@@ -15,9 +15,10 @@
 </p>
 
 <p align="center">
-  <a href="#supported-agents">Works with Claude Code · Codex · Gemini · Copilot · Cursor · Aider · any shell</a> ·
+  <a href="#quickstart">Quickstart</a> ·
   <a href="#how-much-it-saves">Savings</a> ·
-  <a href="docs/token-savings-research.md">Research</a> ·
+  <a href="#supported-agents">Agents</a> ·
+  <a href="#install">Install</a> ·
   <a href="docs/comparison.md">Comparison</a> ·
   <a href="examples/before-after.md">Examples</a> ·
   <a href="LICENSE">MIT</a>
@@ -25,70 +26,93 @@
 
 ---
 
-A hook (and universal shell wrapper) that keeps noisy command output out of an
-AI coding agent's context window.
+**quiet-bash** is a hook (and universal shell wrapper) that keeps noisy command
+output out of an AI coding agent's context window — so you stop paying to re-send
+logs the agent already read.
 
 When the agent runs a known-verbose command — a test run, a build, a buildkite
-invocation, a `docker build`, a `bazel build/test`, or a big `git diff` — the
-full output is redirected to a temp log file and the agent only sees a short
-summary. On failure it still gets the tail of the log (and a pointer to grep
-the rest), so nothing important is lost — and that surfaced tail is cleaned
-first: ANSI colors stripped, carriage-return progress bars collapsed to their
-final state, and repeated lines folded to `(xN)`, so the failure preview stays
-small and readable.
+invocation, a `docker build`, a `bazel build/test`, or a big `git diff` — the full
+output is redirected to a temp log and the agent sees only a short summary. On
+failure it still gets the tail of the log (and a pointer to grep the rest), so
+nothing important is lost — and that tail is cleaned first: ANSI colors stripped,
+carriage-return progress bars collapsed to their final state, and repeated lines
+folded to `(xN)`. Short, quick commands pass through untouched.
 
-Short, quick commands are passed through untouched: wrapping them would cost
-more in extra round-trips than it would save.
+It does the same for **large reads**: a giant `package-lock.json` or a 3,000-line
+source file collapses to a structured preview — a value-folded JSON/YAML summary or
+a **signature outline** of the code — with the full content one `jq` / `Read`-range
+away. A file the agent skims once is never re-sent in full on later turns.
 
-It does the same for **large reads**. A giant `package-lock.json` or a
-3,000-line source file is collapsed to a structured preview — a value-folded
-JSON/YAML summary, or a **signature outline** of the code (imports +
-class/function/method signatures, bodies elided) — with the full content one
-`jq` / `Read`-range away. Files the agent skims once then no longer get re-sent
-in full on every later turn.
+## Highlights
+
+- **99.9% less command output in context** — a test/build/CI log spills to a temp file; the agent sees one summary line, plus the failure tail when it matters. *(measured)*
+- **Large reads collapse too** — a ~300K-token `package-lock.json` → ~660 tokens; a 3,000-line source file → a signature outline. *(measured)*
+- **Lossless** — the full output stays byte-exact on disk, one `jq` / `grep` / `Read`-range away. Nothing is hidden on failure.
+- **Works with 8 agents** — Claude Code · Codex · Gemini · Copilot · Cursor · Aider · OpenCode · or any shell.
+- **Zero dependencies** — just `bash` + `jq`. No daemon, no model, no network call.
+- **Output side too** *(opt-in)* — a `Concise` style and a `minimal-change` skill trim generated tokens and code; stacks with [ponytail](https://github.com/DietrichGebert/ponytail).
+
+## Quickstart
+
+Claude Code — this repo is a single-plugin marketplace:
+
+```sh
+/plugin marketplace add yoeld-wix/quiet-bash
+/plugin install quiet-bash@quiet-bash
+```
+
+Restart Claude Code and you're done. For Codex, Gemini, Copilot, OpenCode, or any
+shell, see **[Install](#install)**.
+
+## Contents
+
+- [How much it saves](#how-much-it-saves)
+- [What it covers](#what-it-covers)
+- [Features in depth](#features-in-depth)
+  - [Large JSON & YAML reads](#large-json--yaml-reads)
+  - [Querying spilled data (`quiet-query`)](#querying-spilled-data-quiet-query)
+  - [Large source files (outlining)](#large-source-files-outlining)
+  - [Large tool results (MCP, WebFetch, WebSearch)](#large-tool-results-mcp-webfetch-websearch)
+  - [Output side: `Concise` style](#output-side-concise-style)
+  - [Output side: `minimal-change` skill](#output-side-minimal-change-skill)
+  - [Prompt quieting (`quiet-prompt`)](#prompt-quieting-quiet-prompt)
+- [Supported agents](#supported-agents)
+- [Install](#install)
+- [Configuration](#configuration)
+- [Requirements](#requirements)
+- [How it works](#how-it-works)
+- [Benchmark](#benchmark)
+- [FAQ](#faq)
+- [License](#license)
 
 ## How much it saves
 
 <p align="center">
-  <img src="assets/reductions-by-layer.svg" alt="Reduction by layer: command output -99.9%, JSON -99.8%, listing -98%, source outline -92%; output side stacked -49% time, -45% code, -16% tokens" width="860">
+  <img src="assets/reductions-by-layer.svg" alt="Reduction by layer (measured): command output -99.9%, JSON -99.3%, listing -98%, source outline -94.7%; output side stacked -49% time, -45% code, -16% tokens" width="860">
 </p>
 
-> **Across 10 real commands on a production monorepo, raw output totaled
-> `536,957` tokens. quiet-bash replaced them with `~250` tokens of summaries —
-> a `99.9%` cut on the command output that reaches the model.**
+> **On real inputs from a 543-commit production monorepo, quiet-bash cuts the three
+> biggest context sinks by 94–99.9% each — a combined `244,352` → `3,227` tokens
+> (`98.7%`). Every number here is reproducible: run [`bench/run.sh`](bench/run.sh).**
 
-<p align="center">
-  <img src="assets/savings-compact.svg" alt="536,957 raw tokens become 250 summary tokens" width="820">
-</p>
-
-| | Without quiet-bash | With quiet-bash | Reduction |
+| Layer (real input) | Without | With quiet-bash | Reduction |
 |---|--:|--:|--:|
-| Average verbose command | ~53,700 tok | ~25 tok | **99.95%** |
-| All 10 commands (this benchmark) | 536,957 tok | 250 tok | **99.9%** |
+| Command output · `git log -p -12` | 40,660 tok | 21 tok | **99.9%** |
+| Large JSON read · `package-lock.json` (652 KB) | 163,064 tok | 1,062 tok | **99.3%** |
+| Source outline · `pr-review.ts` (4,032 lines) | 40,627 tok | 2,144 tok | **94.7%** |
 
-<sub>10-subagent benchmark on a real monorepo — 5 commands run live, 5 modeled
-from representative logs. Token estimate ≈ bytes ÷ 4. Methodology in
-[Benchmark](#benchmark). Research notes in
-[Token savings research](docs/token-savings-research.md).</sub>
-
-> **Large reads collapse too.** A real 3,196-line Python source file
-> (`~33,900` tok) becomes a `164`-symbol outline of `~2,700` tok — **−92%** —
-> with every body one `Read offset=…` away. Large `*.json`/`*.yaml` reads fold
-> the same way (a real `package-lock.json`: `~299,000` → `~660` tok, **−99.8%**).
-> Like logs, a file the agent reads early is re-sent on every later turn, so
-> these savings compound across the session too.
+<sub>Measured by [`bench/run.sh`](bench/run.sh) on real files; token estimate ≈ bytes ÷ 4.
+Full output in [`bench/RESULTS.md`](bench/RESULTS.md). A successful command's summary is a
+fixed one-line `[ok: …]` (~20 tok) regardless of log size. Outline savings depend on the
+body/signature ratio — **~95%** on logic-heavy files, **~78%** on a generated
+all-signature `.d.ts`; both are real, the difference is the input.</sub>
 
 ### Bottom line for an average dev
 
-**≈ 30 % lower token cost on a typical session** — ranging from ~15–20 % for
-read/edit-heavy work to **50 %+** for build- and test-heavy workflows. The rule
-of thumb:
+**≈ 30 % lower token cost on a typical session** — ~15–20 % for read/edit-heavy work,
+**50 %+** for build- and test-heavy workflows. Rule of thumb:
 
 > total saving ≈ (share of your context that is command output) × 99 %
-
-<p align="center">
-  <img src="assets/workflow-context-stacks.svg" alt="Estimated session savings by workflow" width="820">
-</p>
 
 | Your workflow | Command output ≈ | Total token cost saved |
 |---|--:|--:|
@@ -96,37 +120,10 @@ of thumb:
 | Typical (regular test/build loops) | ~30–40 % | **~30 %** |
 | Heavy (TDD, CI-debugging, full builds) | ~50–60 % | **~50 %+** |
 
-The **99.9 %** cut on command output is measured. The session-level percentage
-is a model — it depends on how log-heavy your work is, and prompt caching /
-context compaction move it around — so treat ~30 % as a representative midpoint,
-not a guarantee.
-
-### Why it compounds over a session
-
-An LLM agent is **stateless**: on *every* turn the whole conversation so far —
-including all previous command output — is re-sent as input tokens. A log isn't
-paid for once when it's produced; it's re-paid on every later turn it stays in
-the context window.
-
-So a 600-line `yarn test` dump near the start of a 40-step task isn't a one-time
-cost — it's **~600 lines × every turn that follows**. quiet-bash turns that dump
-into a single `[ok: exit 0 — 612 lines hidden in …]` line that never enters the
-context, so you stop re-paying for it. Illustratively (assumptions below):
-
-| Session | Verbose cmds | Log tokens re-sent **without** | **with** quiet-bash |
-|---|--:|--:|--:|
-| 10 turns | 4 | ~1.1M | ~500 |
-| 25 turns | 10 | ~6.7M | ~3k |
-| 40 turns | 16 | ~17.2M | ~8k |
-
-<sub>Illustrative model: ~40% of turns run a verbose command, each resident for
-~half the remaining session, avg ~53.7k tokens/log. Real numbers depend on how
-log-heavy your work is — but the direction and order of magnitude hold.</sub>
-
-It also **keeps the prompt-cache prefix stable** (fewer giant, varying tool
-results → more context stays cached) and **preserves debuggability** — on
-failure it still surfaces the last 40 lines inline, and small `git diff`/`show`/
-`log` output is shown as normal.
+The **99.9 %** cut on command output is measured. The session-level percentage is a
+model — it depends on how log-heavy your work is, and prompt caching / context
+compaction move it around — so treat ~30 % as a representative midpoint, not a
+guarantee.
 
 ### Output side too — faster *and* cheaper (measured A/B)
 
@@ -134,9 +131,9 @@ failure it still surfaces the last 40 lines inline, and small `git diff`/`show`/
   <img src="assets/output-savings.svg" alt="Measured: −49% response time, −45% code, −16% tokens on a coding turn" width="820">
 </p>
 
-The hooks cut **input**. Two opt-in guidance pieces cut **output** — the half
-priced **3–5×** input and generated **serially** (the latency bottleneck).
-Measured in subagent A/Bs (N=5):
+The hooks cut **input**. Two opt-in guidance pieces cut **output** — the half priced
+**3–5×** input and generated **serially** (the latency bottleneck). Measured in
+subagent A/Bs (N=5):
 
 | Lever | Effect | No regression? |
 |---|--:|---|
@@ -144,8 +141,38 @@ Measured in subagent A/Bs (N=5):
 | `minimal-change` skill | **~45% less code** | correctness preserved |
 | **Both, on a coding turn** | **~30% → ~49% faster, ~16% fewer tokens** | suppresses scope-creep |
 
-<sub>Per-operation input cuts and these output A/Bs are **measured**; the
-session-level ~30% is **modeled** (no single end-to-end benchmark run yet).</sub>
+<sub>Input cuts are measured + reproducible ([`bench/run.sh`](bench/run.sh)). These
+output-side figures are from **live subagent A/Bs** — noisy and task-dependent, so treat
+them as **directional**; the ~45%-less-code gain needs a scope-creep-prone task to appear
+(see [Benchmark](#benchmark) honesty notes). The session-level ~30% is **modeled**.</sub>
+
+<details>
+<summary><strong>Why it compounds over a session</strong> (the stateless-agent math)</summary>
+
+An LLM agent is **stateless**: on *every* turn the whole conversation so far —
+including all previous command output — is re-sent as input tokens. A log isn't paid
+for once when it's produced; it's re-paid on every later turn it stays in context.
+
+So a 600-line `yarn test` dump near the start of a 40-step task isn't a one-time cost
+— it's **~600 lines × every turn that follows**. quiet-bash turns that dump into a
+single `[ok: exit 0 — 612 lines hidden in …]` line that never enters context, so you
+stop re-paying for it:
+
+| Session | Verbose cmds | Log tokens re-sent **without** | **with** quiet-bash |
+|---|--:|--:|--:|
+| 10 turns | 4 | ~1.1M | ~500 |
+| 25 turns | 10 | ~6.7M | ~3k |
+| 40 turns | 16 | ~17.2M | ~8k |
+
+<sub>Illustrative model: ~40% of turns run a verbose command, each resident for ~half
+the remaining session, avg ~53.7k tokens/log. Real numbers depend on how log-heavy
+your work is — but the direction and order of magnitude hold.</sub>
+
+It also **keeps the prompt-cache prefix stable** (fewer giant, varying tool results →
+more context stays cached) and **preserves debuggability** — on failure it still
+surfaces the last 40 lines inline, and small `git diff`/`show`/`log` shows as normal.
+
+</details>
 
 ### vs ponytail — they stack, not compete
 
@@ -160,8 +187,8 @@ session-level ~30% is **modeled** (no single end-to-end benchmark run yet).</sub
 | Savings | 90–99.9% per op *(measured)*, ~30% session *(modeled)* | ~54% less code, ~20% cost, ~27% time *(their benchmark)* |
 | Best for | log/read-heavy sessions | code-generation-heavy sessions |
 
-Disjoint cost sources → **run both for full input + output coverage.** Full
-field map: [Comparison](docs/comparison.md).
+Disjoint cost sources → **run both for full input + output coverage.** Full field
+map: [Comparison](docs/comparison.md).
 
 ## What it covers
 
@@ -180,45 +207,46 @@ field map: [Comparison](docs/comparison.md).
 | **`curl` responses** (`curl <url>`, not `-o`/`-I`/piped/`$(…)`) | > 25 KB → JSON collapses via the JSON preview (handles minified), else head+tail + log path. Small responses inline. Full body on disk. |
 | everything else (`ls`, `cat`, `grep`, `git status`, small `gh …`, …) | Passed through unchanged. |
 
-Already-bounded commands (those with `--stat`, `--oneline`, a pipe to
-`head`/`grep`/…, or a `>` redirect) are left alone, and the hook never
-double-wraps its own output or a follow-up read of a log file.
+Already-bounded commands (those with `--stat`, `--oneline`, a pipe to `head`/`grep`/…,
+or a `>` redirect) are left alone, and the hook never double-wraps its own output or a
+follow-up read of a log file.
 
-### Reading large JSON & YAML
+## Features in depth
 
-`cat`-ing a big `package-lock.json`, `openapi.json`, `pnpm-lock.yaml`, or a k8s
-bundle dumps tens of thousands of tokens the agent mostly skims. quiet-bash
-rewrites a large `*.json`/`*.yaml` read into a **collapsed preview** — repeated
-object/array shapes fold to one sample plus `"N more of M, same shape"` (so keys
-aren't repeated hundreds of times), long strings truncate, and a footer prints
-the exact `jq`/`yq` to query the full file (untouched on disk). A real
-`package-lock.json` went from **~299,000 tokens → ~660** (−99.8%); a 50-doc k8s
-manifest bundle collapses to its first few docs + a count.
+### Large JSON & YAML reads
 
-YAML is converted to JSON with the first available of **`ruby` → `python3`+PyYAML
-→ `yq`** (Ruby ships `yaml`+`json` in its stdlib, so this works out of the box on
-macOS and most CI); if none is present, YAML passes through untouched. Multi-doc
-YAML becomes an array; comments are dropped in conversion (fine for a summary).
+`cat`-ing a big `package-lock.json`, `openapi.json`, `pnpm-lock.yaml`, or a k8s bundle
+dumps tens of thousands of tokens the agent mostly skims. quiet-bash rewrites a large
+`*.json`/`*.yaml` read into a **collapsed preview** — repeated object/array shapes fold
+to one sample plus `"N more of M, same shape"` (so keys aren't repeated hundreds of
+times), long strings truncate, and a footer prints the exact `jq`/`yq` to query the
+full file (untouched on disk). A real `package-lock.json` went from **~299,000 tokens →
+~660** (−99.8%); a 50-doc k8s manifest bundle collapses to its first few docs + a count.
 
-The collapsed-preview format was chosen over gron-flat and schema-only by an
-A/B/C benchmark measuring **tokens *and* answer accuracy**: collapsed used the
-fewest tokens, matched gron on accuracy, and produced **zero hallucinated
-values** — when a value is elided, the agent correctly defers to the file rather
-than guessing. (`schema-only` was disqualified: it can't compress objects keyed
-by distinct names, so `package-lock.json` barely shrank.)
+YAML is converted to JSON with the first available of **`ruby` → `python3`+PyYAML →
+`yq`** (Ruby ships `yaml`+`json` in its stdlib, so this works out of the box on macOS
+and most CI); if none is present, YAML passes through untouched. Multi-doc YAML becomes
+an array; comments are dropped in conversion (fine for a summary).
 
-Pass-through is deliberate: small files, `jq`/`yq` **projections** (you already
-narrowed it), and piped/redirected commands are never touched. Tune with
-`QUIET_JSON_MIN_BYTES` (default 25000).
+The collapsed-preview format was chosen over gron-flat and schema-only by an A/B/C
+benchmark measuring **tokens *and* answer accuracy**: collapsed used the fewest tokens,
+matched gron on accuracy, and produced **zero hallucinated values** — when a value is
+elided, the agent correctly defers to the file rather than guessing. (`schema-only` was
+disqualified: it can't compress objects keyed by distinct names, so `package-lock.json`
+barely shrank.)
 
-### Querying without re-reading (`quiet-query`)
+Pass-through is deliberate: small files, `jq`/`yq` **projections** (you already narrowed
+it), and piped/redirected commands are never touched. Tune with `QUIET_JSON_MIN_BYTES`
+(default 25000).
 
-Spilling is only half the win — the other half is making the spilled payload
-**cheap to interrogate**. Every collapsed-preview footer points at
-`core/quiet-query.sh`, a jq-backed tool with query + aggregation ops that each
-return a small, focused answer (not a dump):
+### Querying spilled data (`quiet-query`)
 
-```
+Spilling is only half the win — the other half is making the spilled payload **cheap to
+interrogate**. Every collapsed-preview footer points at `core/quiet-query.sh`, a
+jq-backed tool with query + aggregation ops that each return a small, focused answer
+(not a dump):
+
+```sh
 quiet-query <file> keys                      # keys + value-types
 quiet-query <file> count  '.items'           # how many
 quiet-query <file> sample '.items' 5         # first 5
@@ -229,44 +257,43 @@ quiet-query <file> stats  '.items' '.price'  # count/min/max/sum/avg
 quiet-query <file> search '<regex>'          # matching paths
 ```
 
-Works on JSON and YAML (shared converter). The agent runs these through its own
-Bash tool, so a 300 K-token result becomes a handful of tiny, targeted queries.
+Works on JSON and YAML (shared converter). The agent runs these through its own Bash
+tool, so a 300 K-token result becomes a handful of tiny, targeted queries.
 
-### Outlining large source files
+### Large source files (outlining)
 
-Reading a 1,800-line module dumps thousands of tokens the agent mostly skims —
-and because the transcript is re-sent every turn, that file is re-billed on every
-later turn. quiet-bash rewrites a large source-file read into a **signature
-outline**: imports plus class/function/method signatures, bodies elided, each
-annotated with the exact line range. The agent expands any body with a single
-`Read <file> offset=<start> limit=<n>` (or `sed -n 'S,Ep' <file>`). The file is
-never modified — it *is* the byte-exact backup.
+Reading a 1,800-line module dumps thousands of tokens the agent mostly skims — and
+because the transcript is re-sent every turn, that file is re-billed on every later
+turn. quiet-bash rewrites a large source-file read into a **signature outline**: imports
+plus class/function/method signatures, bodies elided, each annotated with the exact line
+range. The agent expands any body with a single `Read <file> offset=<start> limit=<n>`
+(or `sed -n 'S,Ep' <file>`). The file is never modified — it *is* the byte-exact backup.
 
 Zero dependencies: symbols are found with `grep`/`awk` (no tree-sitter or ctags
-required). Covers Python, JS/TS, Go, Rust, Java/Kotlin/Scala, Ruby, C/C++, PHP,
-and Swift. Guards against regression: only files over `QUIET_OUTLINE_MIN_BYTES`
-(default 30000) are outlined, only known source extensions, and a file with
-fewer than `QUIET_OUTLINE_MIN_SYMBOLS` (default 3) symbols falls back to the
-normal head/tail preview.
+required). Covers Python, JS/TS, Go, Rust, Java/Kotlin/Scala, Ruby, C/C++, PHP, and
+Swift. Guards against regression: only files over `QUIET_OUTLINE_MIN_BYTES` (default
+30000) are outlined, only known source extensions, and a file with fewer than
+`QUIET_OUTLINE_MIN_SYMBOLS` (default 3) symbols falls back to the normal head/tail
+preview.
 
-### Large tool results (MCP, WebFetch, WebSearch — not just MCP)
+### Large tool results (MCP, WebFetch, WebSearch)
 
-Tool *results* are the third big context sink — MCP web-search dumps, DB rows,
-API payloads, `WebFetch`/`WebSearch` output — they land in context whole and get
-re-sent every later turn. On **Claude Code**, a `PostToolUse` hook (matcher
-`mcp__.*|WebFetch|WebSearch`) fires after a tool returns: if the result is large
-it **spills the byte-exact payload to a file** and replaces what the model sees
-with a compact summary —
+Tool *results* are the third big context sink — MCP web-search dumps, DB rows, API
+payloads, `WebFetch`/`WebSearch` output — they land in context whole and get re-sent
+every later turn. On **Claude Code**, a `PostToolUse` hook (matcher
+`mcp__.*|WebFetch|WebSearch`) fires after a tool returns: if the result is large it
+**spills the byte-exact payload to a file** and replaces what the model sees with a
+compact summary —
 
 - **JSON result** → collapsed preview + the `quiet-query` drill-in footer;
 - **plain-text result** → head + tail + `"…spilled to <file>"` with a `sed`/`grep`
   drill-in.
 
-It mirrors the result's shape (a string result is replaced with a string, an
-MCP `content[]` result with `content[]`) and **passes through any shape it
-doesn't recognize** — safe no-op, never breakage. Small results and non-text
-content also pass through. Lossless: only the *preview* shrinks. Tune with
-`QUIET_RESULT_MIN_BYTES` (default 25000).
+It mirrors the result's shape (a string result is replaced with a string, an MCP
+`content[]` result with `content[]`) and **passes through any shape it doesn't
+recognize** — safe no-op, never breakage. Small results and non-text content also pass
+through. Lossless: only the *preview* shrinks. Tune with `QUIET_RESULT_MIN_BYTES`
+(default 25000).
 
 **Across agents** (same shared core, different hook fields):
 
@@ -277,19 +304,19 @@ content also pass through. Lossless: only the *preview* shrinks. Tune with
 | **Gemini CLI** | `adapters/gemini-result.sh` | `AfterTool` → `decision:"deny"`+`reason` ⚠️ |
 | Codex | — | can't rewrite results yet |
 
-> ⚠️ Gemini has no success-preserving replace field — the only way to substitute
-> text is `decision:"deny"`+`reason`, which marks the call as *denied* (the model
-> may read it as a failed tool call). Use with that in mind. **Codex** can't
-> rewrite tool results via a hook — for Codex and any other MCP client, use the
-> **MCP proxy** below. The Claude Code adapter is contract-tested; the
-> Copilot/Gemini result adapters follow documented schemas but aren't run live.
+> ⚠️ Gemini has no success-preserving replace field — the only way to substitute text
+> is `decision:"deny"`+`reason`, which marks the call as *denied* (the model may read it
+> as a failed tool call). Use with that in mind. **Codex** can't rewrite tool results via
+> a hook — for Codex and any other MCP client, use the **MCP proxy** below. The Claude
+> Code adapter is contract-tested; the Copilot/Gemini result adapters follow documented
+> schemas but aren't run live.
 
 #### Universal MCP proxy (any client, incl. Codex)
 
-For clients without a result-rewrite hook, `proxy/quiet-mcp-proxy.mjs` sits
-between the client and a real MCP server: it forwards every MCP message verbatim
-except large `tools/call` results, which it spills + collapses (same summarizer).
-Point your client's server config at the proxy instead of the server directly:
+For clients without a result-rewrite hook, `proxy/quiet-mcp-proxy.mjs` sits between the
+client and a real MCP server: it forwards every MCP message verbatim except large
+`tools/call` results, which it spills + collapses (same summarizer). Point your client's
+server config at the proxy instead of the server directly:
 
 ```jsonc
 // before:  "command": "npx", "args": ["-y", "some-mcp-server"]
@@ -298,46 +325,76 @@ Point your client's server config at the proxy instead of the server directly:
 "args": ["/abs/path/to/quiet-bash/proxy/quiet-mcp-proxy.mjs", "npx", "-y", "some-mcp-server"]
 ```
 
-Works for **any** MCP client (Claude Code, Codex, Cursor, …) since it operates at
-the transport layer. Lossless; tune with `QUIET_RESULT_MIN_BYTES`. Requires
-`node` (+ `bash`/`jq` for the summarizer). Buffers each result to measure size,
-so it's for request/response servers, not incremental streaming.
+Works for **any** MCP client (Claude Code, Codex, Cursor, …) since it operates at the
+transport layer. Lossless; tune with `QUIET_RESULT_MIN_BYTES`. Requires `node` (+
+`bash`/`jq` for the summarizer). Buffers each result to measure size, so it's for
+request/response servers, not incremental streaming.
 
-### Bonus: the `Concise` output style (faster *and* cheaper output)
+### Output side: `Concise` style
 
-quiet-bash's hooks shrink the *input* side (re-sent tool output, file reads).
-The plugin also ships a Claude Code **output style** (`output-styles/concise.md`)
-for the *output* side — the half priced **3–5× higher** and generated **serially**
-(so it's the latency bottleneck). It steers Claude to lead with the answer and
-cut preamble/filler **without dropping detail** (`keep-coding-instructions: true`,
-explicit no-loss guardrails).
+quiet-bash's hooks shrink the *input* side (re-sent tool output, file reads). The plugin
+also ships a Claude Code **output style** (`output-styles/concise.md`) for the *output*
+side — the half priced **3–5× higher** and generated **serially** (so it's the latency
+bottleneck). It steers Claude to lead with the answer and cut preamble/filler **without
+dropping detail** (`keep-coding-instructions: true`, explicit no-loss guardrails).
 
-In a 10-agent A/B it measured **~10% faster responses** (median 4.0 s vs 4.5 s)
-and ~10–15% smaller output, **with no content lost**. It's **opt-in** (it won't
-hijack your style): enable via `/config` → **Output style** → **Concise**, or set
+In a 10-agent A/B it measured **~10% faster responses** (median 4.0 s vs 4.5 s) and
+~10–15% smaller output, **with no content lost**. It's **opt-in** (it won't hijack your
+style): enable via `/config` → **Output style** → **Concise**, or set
 `"outputStyle": "Concise"` in settings.
 
-### Bonus: the `minimal-change` skill (write less code)
+### Output side: `minimal-change` skill
 
-A skill (`skills/minimal-change/`) for the output side's biggest lever — *less
-code generated*. It steers toward the smallest correct change (reuse before
-rewrite, stdlib/installed deps before new ones, fewest lines) with a strict
-**no-regression floor** (never trim validation, security, error handling, tests).
-A 3-vs-3 A/B measured **~45% less solution code, no correctness loss**. Inspired
-by the open-source **[ponytail](https://github.com/DietrichGebert/ponytail)**
-project (MIT) — install it too for the dedicated, always-on, cross-agent version;
-the two stack (quiet-bash trims input, this trims output).
+A skill (`skills/minimal-change/`) for the output side's biggest lever — *less code
+generated*. It steers toward the smallest correct change (reuse before rewrite,
+stdlib/installed deps before new ones, fewest lines) with a strict **no-regression
+floor** (never trim validation, security, error handling, tests). A 3-vs-3 A/B measured
+**~45% less solution code, no correctness loss**. Inspired by the open-source
+**[ponytail](https://github.com/DietrichGebert/ponytail)** project (MIT) — install it
+too for the dedicated, always-on, cross-agent version; the two stack (quiet-bash trims
+input, this trims output).
+
+### Prompt quieting (`quiet-prompt`)
+
+The hooks above quiet tool *output*. `core/quiet-prompt.sh` quiets the other input
+source: a long **injected prompt** — a startup/hook-injected instruction file, a big
+`CLAUDE.md`/`AGENTS.md` — that's re-sent in context every turn.
+
+The naive fix ("spill the whole prompt to a file, inject a short stub") **breaks
+instruction-following**: an agent reliably fetches sections the current *task* needs but
+skips governance sections (output rules, style, constraints) it has no task-reason to
+open. A measured A/B: **~25% rule-compliance for full-spill vs 100% inline.** So
+quiet-prompt does a **split, not a spill**:
+
+- preamble + every **untagged** section stay **inline** in the stub (always honored)
+- only sections whose heading you tag **`[ref]`** are spilled to disk and replaced by a
+  one-line pointer; the agent loads one with `quiet-prompt.sh <file> --section "<name>"`
+  when a task needs it
+
+```markdown
+## Output rules            ← stays inline (always applied)
+Always begin replies with ACME>.
+
+## API reference [ref]      ← spilled; loaded on demand
+…200 endpoints…
+```
+
+Result in tests: **100% rule-compliance restored** while still cutting the injected
+prompt **~88–95%**. **Safe by default:** no `[ref]` tags (or a file under
+`QUIET_PROMPT_MIN_BYTES`, default 4000) → the whole prompt is injected unchanged.
+`--all` prints the full file; `--section` is byte-exact. Zero-dependency (bash + awk).
+The win is **cost + context headroom, not latency** — the injected prompt isn't the
+generation bottleneck.
 
 ## Supported agents
 
-The detection + rewrite logic lives in one agent-agnostic core
-(`core/quiet-core.sh`); a thin adapter per agent translates that agent's hook
-I/O. Command rewriting requires the agent to support *modifying* a command
-before it runs — not every agent does.
+The detection + rewrite logic lives in one agent-agnostic core (`core/quiet-core.sh`); a
+thin adapter per agent translates that agent's hook I/O. Command rewriting requires the
+agent to support *modifying* a command before it runs — not every agent does.
 
-Two integration styles. **Hooks** (cleanest — the agent rewrites the command
-itself) for agents that support it, and a **universal shell wrapper** that works
-literally everywhere else, including your own terminal.
+Two integration styles: **hooks** (cleanest — the agent rewrites the command itself) for
+agents that support it, and a **universal shell wrapper** that works literally everywhere
+else, including your own terminal.
 
 | Agent | Adapter | Mechanism |
 |---|---|---|
@@ -348,18 +405,16 @@ literally everywhere else, including your own terminal.
 | **Cursor / Aider / Windsurf / Cline / OpenCode / any** | `adapters/shell-wrapper.sh` | shell functions sourced in `~/.bashrc`/`~/.zshrc` — no agent hook needed |
 | **Your own terminal** | `adapters/shell-wrapper.sh` | same — quiets your interactive shell too |
 
-So: agents with a command-rewriting hook use a hook; everything else (Cursor and
-Aider have no command-rewrite hook) uses the shell wrapper. Either way, you're
-covered.
+So: agents with a command-rewriting hook use a hook; everything else (Cursor and Aider
+have no command-rewrite hook) uses the shell wrapper. Either way, you're covered.
 
-> **Verification status.** The Claude Code adapter, the shell wrapper, and the
-> PATH shims are tested end-to-end. The Codex, Gemini, and Copilot adapters are
-> **contract-verified** — their input parsing and output shape are tested against
-> each CLI's documented hook schema (this caught a real bug: Copilot sends
-> `toolArgs` as a JSON-encoded *string*, now handled). They have **not** yet been
-> run against a live authenticated CLI. Known caveat: Codex's `updatedInput`
-> rewrite needs a recent Codex version (older ones reject it). Issues/PRs from
-> live users welcome.
+> **Verification status.** The Claude Code adapter, the shell wrapper, and the PATH shims
+> are tested end-to-end. The Codex, Gemini, and Copilot adapters are **contract-verified**
+> — their input parsing and output shape are tested against each CLI's documented hook
+> schema (this caught a real bug: Copilot sends `toolArgs` as a JSON-encoded *string*,
+> now handled). They have **not** yet been run against a live authenticated CLI. Known
+> caveat: Codex's `updatedInput` rewrite needs a recent Codex version (older ones reject
+> it). Issues/PRs from live users welcome.
 
 ## Install
 
@@ -367,7 +422,7 @@ covered.
 
 This repo doubles as a single-plugin marketplace:
 
-```
+```sh
 /plugin marketplace add yoeld-wix/quiet-bash
 /plugin install quiet-bash@quiet-bash
 ```
@@ -389,26 +444,25 @@ Restart Claude Code so the hook registers. To install manually instead, add a
 
 ### OpenAI Codex CLI
 
-```
+```sh
 codex plugin marketplace add yoeld-wix/quiet-bash
 ```
 
-Then register `adapters/codex.sh` as a `PreToolUse` hook in `~/.codex/hooks.json`
-(or run `./install.sh codex` to print the config) and approve it via `/hooks`.
+Then register `adapters/codex.sh` as a `PreToolUse` hook in `~/.codex/hooks.json` (or run
+`./install.sh codex` to print the config) and approve it via `/hooks`.
 
 ### Gemini CLI
 
-```
+```sh
 gemini extensions install https://github.com/yoeld-wix/quiet-bash
 ```
 
-Then add a `BeforeTool` hook in `settings.json` with
-`matcher: "run_shell_command"` running `adapters/gemini.sh`
-(or `./install.sh gemini`).
+Then add a `BeforeTool` hook in `settings.json` with `matcher: "run_shell_command"`
+running `adapters/gemini.sh` (or `./install.sh gemini`).
 
 ### GitHub Copilot CLI
 
-```
+```sh
 copilot plugin marketplace add yoeld-wix/quiet-bash
 ```
 
@@ -417,9 +471,8 @@ Then add a `preToolUse` hook in `.github/hooks/quiet-bash.json` running
 
 ### OpenCode
 
-OpenCode loads a native plugin via its `tool.execute.after` hook. **Register it
-in your `opencode.json`** (dir auto-discovery does *not* load it — registration is
-required):
+OpenCode loads a native plugin via its `tool.execute.after` hook. **Register it in your
+`opencode.json`** (dir auto-discovery does *not* load it — registration is required):
 
 ```jsonc
 {
@@ -429,43 +482,42 @@ required):
 ```
 
 It quiets large `bash` tool results (spill + summary, reusing the same
-`core/quiet-result.sh` summarizer); small and non-bash results pass through.
-**Confirmed live end-to-end** in a real OpenCode session: a capable model ran a
-verbose command, the hook fired, and a 10 KB result became a 657-char
-`[quiet-bash]` summary with the full output spilled byte-exact. Requires `bash` +
-`jq` on PATH. Note: small local models (e.g. 7B over Ollama's OpenAI-compatible
-endpoint) may *text-dump* tool calls instead of invoking them, so the hook never
-fires — use a model with reliable tool-calling.
+`core/quiet-result.sh` summarizer); small and non-bash results pass through. **Confirmed
+live end-to-end** in a real OpenCode session: a capable model ran a verbose command, the
+hook fired, and a 10 KB result became a 657-char `[quiet-bash]` summary with the full
+output spilled byte-exact. Requires `bash` + `jq` on PATH. Note: small local models (e.g.
+7B over Ollama's OpenAI-compatible endpoint) may *text-dump* tool calls instead of
+invoking them, so the hook never fires — use a model with reliable tool-calling.
 
 ### Cursor, Aider, Windsurf, Cline, or any shell (universal)
 
-These agents have no command-rewriting hook, so quiet-bash intercepts at the
-shell level. Two ways:
+These agents have no command-rewriting hook, so quiet-bash intercepts at the shell level.
+Two ways:
 
-**PATH shims (recommended for agents).** Agents usually run commands in
-*non-interactive* shells that never source your rc, so generate real shim
-executables and put them first on `PATH`:
+**PATH shims (recommended for agents).** Agents usually run commands in *non-interactive*
+shells that never source your rc, so generate real shim executables and put them first on
+`PATH`:
 
-```bash
+```sh
 ./adapters/install-shims.sh            # creates ~/.quiet-bash/shims
 export PATH="$HOME/.quiet-bash/shims:$PATH"   # add to rc AND the agent's env
 ```
 
-This works under every shell type because it's `PATH`, not rc — the same
-mechanism `asdf`/`pyenv` use. (Explicit paths like `./gradlew` bypass it by
-design; the hook adapters catch those.)
+This works under every shell type because it's `PATH`, not rc — the same mechanism
+`asdf`/`pyenv` use. (Explicit paths like `./gradlew` bypass it by design; the hook
+adapters catch those.)
 
 **rc functions (simplest for your own terminal).** For interactive shells:
 
-```bash
+```sh
 echo 'source /abs/path/to/quiet-bash/adapters/shell-wrapper.sh' >> ~/.zshrc
 # or ~/.bashrc
 ```
 
-Both define wrappers for the verbose tools (`yarn`, `npm`, `pytest`, `cargo`,
-`gradle`, `jest`, …) that redirect output to a log and print a summary;
-`--version`/`--help` and non-build subcommands pass through. `git diff/show/log`
-is left alone here (you usually want it in an interactive shell).
+Both define wrappers for the verbose tools (`yarn`, `npm`, `pytest`, `cargo`, `gradle`,
+`jest`, …) that redirect output to a log and print a summary; `--version`/`--help` and
+non-build subcommands pass through. `git diff/show/log` is left alone here (you usually
+want it in an interactive shell).
 
 ## Configuration
 
@@ -477,72 +529,79 @@ Override via environment variables (defaults shown):
 | `QUIET_INLINE_LINE_LIMIT` | `60` | git output up to this many lines is shown inline |
 | `QUIET_FAIL_TAIL_LINES` | `40` | lines of a failed command's log to surface |
 | `QUIET_LOG_RETENTION_MINUTES` | `1440` | prune redirect logs older than this on each run |
+| `QUIET_JSON_MIN_BYTES` | `25000` | collapse `*.json`/`*.yaml` reads larger than this |
+| `QUIET_OUTLINE_MIN_BYTES` | `30000` | outline source files larger than this |
+| `QUIET_OUTLINE_MIN_SYMBOLS` | `3` | below this many symbols, skip outlining |
+| `QUIET_RESULT_MIN_BYTES` | `25000` | collapse tool results / MCP results larger than this |
+| `QUIET_PROMPT_MIN_BYTES` | `4000` | below this, inject a prompt whole (no quieting) |
 
-- `QUIET_OUTLINE_MIN_BYTES` (default 30000) — outline source files larger than this.
-- `QUIET_OUTLINE_MIN_SYMBOLS` (default 3) — below this many symbols, skip outlining.
-
-To cover more commands, extend the `always`/`managed` patterns in
-`core/quiet-core.sh`.
+To cover more commands, extend the `always`/`managed` patterns in `core/quiet-core.sh`.
 
 ## Requirements
 
-- A supported agent (see table above), or any shell for the universal wrapper
+- A supported agent (see [Supported agents](#supported-agents)), or any shell for the
+  universal wrapper
 - `jq` and `bash` on `PATH`
+- `node` only for the MCP proxy and the OpenCode plugin
 
 ## How it works
 
-Each adapter reads its agent's pre-tool event JSON, extracts the shell command,
-and calls `quiet_rewrite` from the core. For a known-verbose command the core
-returns a rewritten command that redirects output to `mktemp` and prints only a
-summary; the adapter wraps that in whatever rewrite field its agent expects.
-Non-matching commands return nothing, so they run unchanged. Each invocation
-also prunes redirect logs older than `QUIET_LOG_RETENTION_MINUTES`.
+Each adapter reads its agent's pre-tool event JSON, extracts the shell command, and calls
+`quiet_rewrite` from the core. For a known-verbose command the core returns a rewritten
+command that redirects output to `mktemp` and prints only a summary; the adapter wraps
+that in whatever rewrite field its agent expects. Non-matching commands return nothing, so
+they run unchanged. Each invocation also prunes redirect logs older than
+`QUIET_LOG_RETENTION_MINUTES`.
 
 ## Benchmark
 
-The savings numbers above come from a 10-subagent benchmark over a mix of real
-and modeled commands:
+The input-side numbers are produced by **[`bench/run.sh`](bench/run.sh)** — a
+reproducible harness you can run yourself. Point it at real files and it measures raw
+bytes vs the bytes quiet-bash actually leaves in context, then prints the table:
 
-- **5 real** commands were executed on a production monorepo and their combined
-  stdout+stderr measured (`git diff HEAD~25 HEAD`, `git log --stat -150`,
-  `git log -p -12`, `git log --oneline -1200`, a repo-wide `find`).
-- **5 modeled** commands used representative logs for build/test/install flows
-  (`yarn build`, `jest`, `yarn install`, `docker build`, `eslint + tsc`).
+```sh
+QB_JSON=path/to/package-lock.json \
+QB_SRC=path/to/big-source-file.ts \
+QB_REPO=path/to/a/git/repo \
+bench/run.sh
+```
 
-For each, raw output tokens were estimated as `bytes ÷ 4` and compared against
-the fixed ~25-token summary quiet-bash leaves behind. The session projection
-assumes ~40% of turns run a verbose command, each resident for ~half the
-remaining session — change those and the absolute numbers move, but a verbose
-command going from tens of thousands of tokens to ~25 is exact.
+Each layer runs the *real* summarizer (`quiet-json.sh`, `quiet-outline.sh`) or a real
+verbose command (`git log -p -12`). Raw output tokens are estimated as `bytes ÷ 4` —
+coarse, but the reductions dwarf any tokenizer variance. The committed run is in
+[`bench/RESULTS.md`](bench/RESULTS.md). A successful command's "with" size is the fixed
+one-line summary the wrapper prints (~20 tok), not an estimate.
 
-> Honesty note: the **99.9%** figure is the reduction in *command-output*
-> tokens, which are typically the largest single slice of an agentic session's
-> context — not a claim that your total bill drops 99.9%. Your overall saving
-> depends on how much of your session is verbose command output.
+> **Honesty notes.** (1) The per-layer reductions above are **measured and reproducible**.
+> (2) The **session-level ~30%** is a **model** — `(share of context that is command
+> output) × the per-layer reduction` — not a single measured value; it moves with your
+> workflow and with prompt caching/compaction. (3) The **output-side** numbers
+> (`Concise` speed, `minimal-change` code size) are from **live subagent A/Bs**, which are
+> noisy and task-dependent — a trivial one-function task shows little code-size difference
+> (the gain there is reduced output *prose*); the ~45%-less-code figure needs a
+> scope-creep-prone task to appear. Treat output-side numbers as directional, not exact.
 
 ## FAQ
 
-**Does it hide errors?** No. On a non-zero exit it prints the last
-`QUIET_FAIL_TAIL_LINES` (40) lines inline plus the log path, so the agent sees
-what failed and can grep the rest.
+**Does it hide errors?** No. On a non-zero exit it prints the last `QUIET_FAIL_TAIL_LINES`
+(40) lines inline plus the log path, so the agent sees what failed and can grep the rest.
 
-**Where does the full output go?** A temp file (`$TMPDIR/claude-cmd-XXXXXX`). The
-agent can `grep`/`tail` it anytime; logs older than 24h are pruned automatically.
+**Where does the full output go?** A temp file (`$TMPDIR/claude-cmd-XXXXXX`). The agent can
+`grep`/`tail` it anytime; logs older than 24h are pruned automatically.
 
-**Will it break commands whose output I actually need?** It only wraps known-
-verbose build/test/install/CI commands and *large* `git diff/show/log`. Small git
-output, `ls`, `cat`, `grep`, `gh`, etc. pass through untouched.
+**Will it break commands whose output I actually need?** It only wraps known-verbose
+build/test/install/CI commands and *large* `git diff/show/log`. Small git output, `ls`,
+`cat`, `grep`, `gh`, etc. pass through untouched.
 
-**What's the overhead?** A short command is never wrapped (wrapping costs an
-extra round-trip), so there's effectively none where it wouldn't pay off.
+**What's the overhead?** A short command is never wrapped (wrapping costs an extra
+round-trip), so there's effectively none where it wouldn't pay off.
 
-**Does it work outside an agent?** Yes — the shell wrapper / PATH shims quiet your
-own interactive terminal too.
+**Does it work outside an agent?** Yes — the shell wrapper / PATH shims quiet your own
+interactive terminal too.
 
-**Are all the adapters tested?** The Claude Code adapter, the shell wrapper, and
-the PATH shims are covered by CI. The Codex/Gemini/Copilot adapters follow each
-tool's documented hook format but aren't yet verified on a live install — issues/
-PRs welcome.
+**Are all the adapters tested?** The Claude Code adapter, the shell wrapper, and the PATH
+shims are covered by CI. The Codex/Gemini/Copilot adapters follow each tool's documented
+hook format but aren't yet verified on a live install — issues/PRs welcome.
 
 ## License
 

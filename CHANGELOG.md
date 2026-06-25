@@ -3,6 +3,44 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.22.0] — 2026-06-25
+
+### Added
+- **Prompt quieting** (`core/quiet-prompt.sh`) — shrink a long *injected* prompt
+  (a startup/hook-injected instruction file, big `CLAUDE.md`/`AGENTS.md`, etc.)
+  without dropping the rules the agent must always follow. It does a **split, not a
+  spill**: preamble + every untagged section stay **inline** in the stub, and only
+  sections whose heading the author tags `[ref]` are spilled to disk and replaced by
+  a one-line "load on demand" pointer. The agent loads a reference section with
+  `quiet-prompt.sh <file> --section "<name>"` when a task needs it.
+  - **Why the split.** A measured A/B showed the naive "spill the whole prompt +
+    inject a stub" pattern is unsafe: agents reliably fetch sections the current
+    *task* needs but skip governance sections (output rules, style, constraints)
+    they have no task-reason to open — **~25% rule-compliance for full-spill vs 100%
+    inline**. The split (inline directives, spill only bulky reference) restored
+    **100% compliance** while still cutting the injected prompt ~88–95% in tests.
+  - **Safe by default / lossless.** If no section is tagged `[ref]` (or the file is
+    below `QUIET_PROMPT_MIN_BYTES`, default 4000), the whole prompt is injected
+    unchanged — quieting never silently degrades instruction-following. `--all`
+    prints the full file; `--section` is byte-exact. Embedded JSON/YAML in a spilled
+    section can be queried with `quiet-query.sh` after loading it.
+  - Zero-dependency (bash + awk), shellcheck-clean. Six regression tests in the suite.
+- **Reproducible benchmark** (`bench/run.sh`) — measures raw bytes vs the bytes
+  quiet-bash leaves in context, on real files you point it at (`QB_JSON`/`QB_SRC`/
+  `QB_REPO`), and prints the savings table. Committed run in `bench/RESULTS.md`.
+  Replaces the old partly-modeled "536,957 across 10 commands" headline with numbers
+  anyone can reproduce.
+
+### Changed
+- **README rewrite** to best-README structure: scannable Highlights, a Quickstart, a
+  Table of Contents, grouped "Features in depth", and collapsible deep-dive details.
+- **Honest numbers pass.** Headline savings now cite the reproducible `bench/run.sh`
+  run on real monorepo files — command output **−99.9%**, JSON **−99.3%**, source
+  outline **−94.7%** (−78% worst-case on a generated all-signature `.d.ts`). Output-side
+  figures (`Concise` speed, `minimal-change` code size) are relabelled as **directional**
+  live-A/B results (noisy, task-dependent), and the session-level ~30% as an explicit
+  **model**, not a measured value.
+
 ## [1.21.0] — 2026-06-25
 
 ### Added

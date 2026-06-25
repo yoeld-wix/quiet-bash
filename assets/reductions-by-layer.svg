@@ -14,15 +14,15 @@
   </g>
   <g fill="#1fb588">
     <rect x="210" y="126" width="599" height="18" rx="4"/>
-    <rect x="210" y="158" width="599" height="18" rx="4"/>
+    <rect x="210" y="158" width="596" height="18" rx="4"/>
     <rect x="210" y="190" width="588" height="18" rx="4"/>
-    <rect x="210" y="222" width="552" height="18" rx="4"/>
+    <rect x="210" y="222" width="568" height="18" rx="4"/>
   </g>
   <g font-size="12.5" font-weight="700" fill="#0f172a">
     <text x="770" y="139">-99.9%</text>
-    <text x="770" y="171">-99.8%</text>
+    <text x="767" y="171">-99.3%</text>
     <text x="762" y="203" fill="#f1f5f9">-98%</text>
-    <text x="726" y="235" fill="#f1f5f9">-92%</text>
+    <text x="732" y="235" fill="#f1f5f9">-94.7%</text>
   </g>
 
   <!-- OUTPUT group -->
