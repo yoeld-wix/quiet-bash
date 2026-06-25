@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [1.22.1] — 2026-06-25
 
+### Changed
+- **Charts redesigned, theme-adaptive + professional.** All three README charts now ship
+  light + dark variants, auto-selected via `<picture>` + `prefers-color-scheme`. Redrawn
+  single-accent (dropped the acid-green glow), neutral "removed" bars, tabular numerals,
+  and a clear raw→kept framing with an aggregate `−98.7%` stat. Numbers synced to the
+  reproducible benchmarks.
+
 ### Fixed
 - **Claude Code adapter was a silent no-op on current Claude Code (v2.1.x).** Claude Code
   only applies a PreToolUse `updatedInput` rewrite when the hook *also* returns

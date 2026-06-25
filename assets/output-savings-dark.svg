@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 250" font-family="system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="obgD" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#11192a"/><stop offset="1" stop-color="#0c1320"/></linearGradient>
+    <linearGradient id="ocD" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c97a61"/><stop offset="1" stop-color="#b3603f"/></linearGradient>
+  </defs>
+  <rect width="860" height="250" rx="14" fill="url(#obgD)"/>
+  <rect x="0.5" y="0.5" width="859" height="249" rx="13.5" fill="none" stroke="#243046"/>
+
+  <text x="36" y="46" fill="#eaf0f7" font-size="21" font-weight="650">Output side — faster <tspan fill="#7d8ba0" font-weight="400">&amp;</tspan> cheaper</text>
+  <text x="824" y="42" text-anchor="end" fill="#cf8a72" font-size="10" font-weight="700" letter-spacing="1.4" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">DIRECTIONAL · LIVE A/B</text>
+  <text x="36" y="68" fill="#7d8ba0" font-size="12.5">Opt-in output levers. Noisy + task-dependent — bar = observed reduction, not a guarantee.</text>
+
+  <text x="36" y="110" fill="#eaf0f7" font-size="14" font-weight="600">Response time<tspan dx="9" font-size="11.5" font-weight="400" fill="#7d8ba0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">Concise + minimal-change</tspan></text>
+  <text x="824" y="110" text-anchor="end" fill="#cf8a72" font-size="16" font-weight="700" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums">−49%</text>
+  <rect x="36" y="118" width="788" height="18" rx="5" fill="#0c1320" stroke="#222e42"/>
+  <rect x="37" y="119" width="386" height="16" rx="4" fill="url(#ocD)"/>
+
+  <text x="36" y="162" fill="#eaf0f7" font-size="14" font-weight="600">Code written<tspan dx="9" font-size="11.5" font-weight="400" fill="#7d8ba0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">minimal-change skill</tspan></text>
+  <text x="824" y="162" text-anchor="end" fill="#cf8a72" font-size="16" font-weight="700" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums">−45%</text>
+  <rect x="36" y="170" width="788" height="18" rx="5" fill="#0c1320" stroke="#222e42"/>
+  <rect x="37" y="171" width="355" height="16" rx="4" fill="url(#ocD)"/>
+
+  <text x="36" y="214" fill="#eaf0f7" font-size="14" font-weight="600">Total tokens<tspan dx="9" font-size="11.5" font-weight="400" fill="#7d8ba0" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">on a coding turn</tspan></text>
+  <text x="824" y="214" text-anchor="end" fill="#cf8a72" font-size="16" font-weight="700" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums">−16%</text>
+  <rect x="36" y="222" width="788" height="18" rx="5" fill="#0c1320" stroke="#222e42"/>
+  <rect x="37" y="223" width="126" height="16" rx="4" fill="url(#ocD)"/>
+</svg>

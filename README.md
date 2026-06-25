@@ -86,7 +86,10 @@ shell, see **[Install](#install)**.
 ## How much it saves
 
 <p align="center">
-  <img src="assets/reductions-by-layer.svg" alt="Where the tokens go (measured): bar length = raw tokens, glowing sliver = what survives. JSON read 163,064 to 1,062 tok (-99.3%), command output 40,660 to 21 (-99.9%), source outline 40,627 to 2,144 (-94.7%); total -98.7%" width="860">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/reductions-by-layer-dark.svg">
+    <img src="assets/reductions-by-layer-light.svg" alt="Where the tokens go (measured): bar length = raw tokens, sliver = what survives. JSON read 163,064 to 1,062 tok (-99.3%), command output 40,660 to 21 (-99.9%), source outline 40,627 to 2,144 (-94.7%); total -98.7%" width="860">
+  </picture>
 </p>
 
 > **On real inputs from a 543-commit production monorepo, quiet-bash cuts the three
@@ -151,7 +154,10 @@ across-the-board win.
 ### Output side too — faster *and* cheaper (measured A/B)
 
 <p align="center">
-  <img src="assets/output-savings.svg" alt="Measured: −49% response time, −45% code, −16% tokens on a coding turn" width="820">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/output-savings-dark.svg">
+    <img src="assets/output-savings-light.svg" alt="Directional live A/B: −49% response time, −45% code, −16% tokens on a coding turn" width="860">
+  </picture>
 </p>
 
 The hooks cut **input**. Two opt-in guidance pieces cut **output** — the half priced
@@ -201,7 +207,10 @@ surfaces the last 40 lines inline, and small `git diff`/`show`/`log` shows as no
 ### vs ponytail — they stack, not compete
 
 <p align="center">
-  <img src="assets/stack-coverage.svg" alt="quiet-bash covers the input half (mechanical, lossless); Concise + minimal-change or ponytail cover the output half — run them together" width="820">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/stack-coverage-dark.svg">
+    <img src="assets/stack-coverage-light.svg" alt="quiet-bash covers the input half (mechanical, lossless); Concise + minimal-change or ponytail cover the output half — run them together" width="860">
+  </picture>
 </p>
 
 | | quiet-bash | [ponytail](https://github.com/DietrichGebert/ponytail) |

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 398" font-family="system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+  <defs>
+    <linearGradient id="keptL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0ea372"/><stop offset="1" stop-color="#0b8c62"/></linearGradient>
+  </defs>
+  <rect width="860" height="398" rx="14" fill="#ffffff"/>
+  <rect x="0.5" y="0.5" width="859" height="397" rx="13.5" fill="none" stroke="#e4e9f0"/>
+
+  <text x="36" y="46" fill="#111827" font-size="21" font-weight="650" letter-spacing="-.01em">What the agent stops re-reading</text>
+  <text x="36" y="68" fill="#6b7686" font-size="12.5">Every turn re-sends the whole transcript — quiet-bash keeps the bulk on disk, not in context.</text>
+
+  <rect x="662" y="18" width="162" height="48" rx="8" fill="#0ea372" fill-opacity="0.08" stroke="#bfe9d8"/>
+  <text x="743" y="44" text-anchor="middle" fill="#0b8c62" font-size="24" font-weight="700" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums">−98.7%</text>
+  <text x="743" y="59" text-anchor="middle" fill="#6b7686" font-size="9" letter-spacing=".08em">REMOVED FROM CONTEXT</text>
+
+  <rect x="36" y="87" width="10" height="10" rx="2.5" fill="#0ea372"/>
+  <text x="52" y="96" fill="#6b7686" font-size="11.5">kept in context</text>
+  <rect x="170" y="87" width="10" height="10" rx="2.5" fill="#c2cbd8"/>
+  <text x="186" y="96" fill="#6b7686" font-size="11.5">removed — on disk, one grep away</text>
+
+  <text x="36" y="133" fill="#111827" font-size="14" font-weight="600">JSON read<tspan dx="9" font-size="11.5" font-weight="400" fill="#6b7686" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">package-lock.json · 652 KB</tspan></text>
+  <text x="824" y="133" text-anchor="end" fill="#0b8c62" font-size="16" font-weight="700" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums">−99.3%</text>
+  <rect x="36" y="141" width="788" height="26" rx="5" fill="#f1f4f8" stroke="#e4e9f0"/>
+  <rect x="37" y="142" width="786" height="24" rx="4.5" fill="#d4dbe5"/>
+  <rect x="37" y="142" width="6" height="24" rx="3" fill="url(#keptL)"/>
+  <text x="824" y="187" text-anchor="end" fill="#6b7686" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums"><tspan fill="#374151" font-weight="600">163,064</tspan> raw <tspan fill="#9aa5b4">→</tspan> <tspan fill="#0b8c62" font-weight="700">1,062</tspan> kept</text>
+
+  <text x="36" y="215" fill="#111827" font-size="14" font-weight="600">Command output<tspan dx="9" font-size="11.5" font-weight="400" fill="#6b7686" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">git log -p -12</tspan></text>
+  <text x="824" y="215" text-anchor="end" fill="#0b8c62" font-size="16" font-weight="700" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums">−99.9%</text>
+  <rect x="36" y="223" width="788" height="26" rx="5" fill="#f1f4f8" stroke="#e4e9f0"/>
+  <rect x="37" y="224" width="195" height="24" rx="4.5" fill="#d4dbe5"/>
+  <rect x="37" y="224" width="4" height="24" rx="2" fill="url(#keptL)"/>
+  <text x="824" y="269" text-anchor="end" fill="#6b7686" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums"><tspan fill="#374151" font-weight="600">40,660</tspan> raw <tspan fill="#9aa5b4">→</tspan> <tspan fill="#0b8c62" font-weight="700">21</tspan> kept</text>
+
+  <text x="36" y="297" fill="#111827" font-size="14" font-weight="600">Source outline<tspan dx="9" font-size="11.5" font-weight="400" fill="#6b7686" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">pr-review.ts · 4,032 lines</tspan></text>
+  <text x="824" y="297" text-anchor="end" fill="#0b8c62" font-size="16" font-weight="700" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums">−94.7%</text>
+  <rect x="36" y="305" width="788" height="26" rx="5" fill="#f1f4f8" stroke="#e4e9f0"/>
+  <rect x="37" y="306" width="195" height="24" rx="4.5" fill="#d4dbe5"/>
+  <rect x="37" y="306" width="11" height="24" rx="3" fill="url(#keptL)"/>
+  <text x="824" y="351" text-anchor="end" fill="#6b7686" font-size="11.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-variant-numeric="tabular-nums"><tspan fill="#374151" font-weight="600">40,627</tspan> raw <tspan fill="#9aa5b4">→</tspan> <tspan fill="#0b8c62" font-weight="700">2,144</tspan> kept</text>
+
+  <line x1="36" y1="369" x2="824" y2="369" stroke="#e4e9f0"/>
+  <text x="36" y="386" fill="#9aa5b4" font-size="11" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">Real files · 244,352 → 3,227 tok · reproduce with bench/run.sh · full track = 163,064 tok</text>
+</svg>
