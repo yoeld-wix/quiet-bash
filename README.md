@@ -105,23 +105,26 @@ fixed one-line `[ok: …]` (~20 tok) regardless of log size. Outline savings dep
 body/signature ratio — **~95%** on logic-heavy files, **~78%** on a generated
 all-signature `.d.ts`; both are real, the difference is the input.</sub>
 
-### Bottom line for an average dev
+### Bottom line on a real session — measured, not modeled
 
-**≈ 30 % lower token cost on a typical session** — ~15–20 % for read/edit-heavy work,
-**50 %+** for build- and test-heavy workflows. Rule of thumb:
+We measured this on **136 real agent sessions** with
+[`bench/session-savings.py`](bench/session-savings.py) (it scans your own Claude Code
+transcripts) instead of assuming a number. How much of each session's context was large
+tool output quiet-bash collapses:
 
-> total saving ≈ (share of your context that is command output) × 99 %
+| Across 136 real sessions | Share of context that's collapsible large output |
+|---|--:|
+| **Pooled (all bytes)** | **13.7 %** |
+| Median session | **0 %** |
+| Mean session | 9.7 % |
+| p90 — log/build-heavy session | **30.6 %** |
 
-| Your workflow | Command output ≈ | Total token cost saved |
-|---|--:|--:|
-| Light (mostly reading/editing) | ~15–20 % of context | **~15–20 %** |
-| Typical (regular test/build loops) | ~30–40 % | **~30 %** |
-| Heavy (TDD, CI-debugging, full builds) | ~50–60 % | **~50 %+** |
-
-The **99.9 %** cut on command output is measured. The session-level percentage is a
-model — it depends on how log-heavy your work is, and prompt caching / context
-compaction move it around — so treat ~30 % as a representative midpoint, not a
-guarantee.
+The honest read: **payoff scales with how log/build/read-heavy your work is.** Half of
+sessions have little large output (median 0 %) — light editing barely benefits — while
+CI-debugging and test-loop sessions hit 30 %+. This is a **conservative floor**: it
+counts each output once, but an agent is stateless and **re-sends it every later turn**,
+so the actual token-bill saving runs higher — and for the operations that *do* fire, the
+cut is the measured **94–99.9 %** above. Reproduce on your own history: `bench/session-savings.py`.
 
 ### Output side too — faster *and* cheaper (measured A/B)
 
@@ -142,7 +145,8 @@ subagent A/Bs (N=5):
 <sub>Input cuts are measured + reproducible ([`bench/run.sh`](bench/run.sh)). These
 output-side figures are from **live subagent A/Bs** — noisy and task-dependent, so treat
 them as **directional**; the ~45%-less-code gain needs a scope-creep-prone task to appear
-(see [Benchmark](#benchmark) honesty notes). The session-level ~30% is **modeled**.</sub>
+(see [Benchmark](#benchmark) honesty notes). Session-level saving is **measured** at
+~14% pooled (median 0%, p90 31%) across 136 real sessions — see Bottom line.</sub>
 
 <details>
 <summary><strong>Why it compounds over a session</strong> (the stateless-agent math)</summary>
@@ -182,7 +186,7 @@ surfaces the last 40 lines inline, and small `git diff`/`show`/`log` shows as no
 |---|---|---|
 | Attacks | **input** (what re-enters context) | **output** (code the model writes) |
 | Mechanism | mechanical hooks/proxy — **lossless** | behavioral rules/prompt |
-| Savings | 90–99.9% per op *(measured)*, ~30% session *(modeled)* | ~54% less code, ~20% cost, ~27% time *(their benchmark)* |
+| Savings | 90–99.9% per op *(measured)*, ~14% pooled session *(measured, 136 sessions)* | ~54% less code, ~20% cost, ~27% time *(their benchmark)* |
 | Best for | log/read-heavy sessions | code-generation-heavy sessions |
 
 Disjoint cost sources → **run both for full input + output coverage.** Full field
@@ -571,9 +575,10 @@ coarse, but the reductions dwarf any tokenizer variance. The committed run is in
 one-line summary the wrapper prints (~20 tok), not an estimate.
 
 > **Honesty notes.** (1) The per-layer reductions above are **measured and reproducible**.
-> (2) The **session-level ~30%** is a **model** — `(share of context that is command
-> output) × the per-layer reduction` — not a single measured value; it moves with your
-> workflow and with prompt caching/compaction. (3) The **output-side** numbers
+> (2) The **session-level number is also measured** — `bench/session-savings.py` scans
+> real Claude Code transcripts: 13.7% pooled / median 0% / p90 31% across 136 sessions.
+> It's a one-time floor (re-send per turn makes the real bill-saving higher) and varies
+> with how log-heavy your work is. (3) The **output-side** numbers
 > (`Concise` speed, `minimal-change` code size) are from **live subagent A/Bs**, which are
 > noisy and task-dependent — a trivial one-function task shows little code-size difference
 > (the gain there is reduced output *prose*); the ~45%-less-code figure needs a

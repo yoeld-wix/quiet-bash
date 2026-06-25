@@ -76,12 +76,10 @@ if [ "$total_raw" -gt 0 ]; then
 fi
 echo
 cat <<'NOTE'
-Session-level saving is a MODEL, not a single measurable value — it depends on
-what fraction of your context is command output / large reads:
-
-    total session saving ≈ (that fraction) × (the per-layer reduction above)
-
-So a session where ~⅓ of context is verbose output lands near ~30% fewer input
-tokens; a build/test-heavy session lands higher. The per-layer reductions above
-are measured and reproducible; the session % is this multiplication, nothing more.
+The per-layer reductions above are measured and reproducible. For the SESSION-level
+saving, don't model it — measure it: bench/session-savings.py scans real Claude Code
+transcripts and reports what fraction of context was large tool output quiet-bash
+collapses (13.7% pooled / median 0% / p90 31% across 136 sessions in our run). It's a
+one-time floor; the agent re-sends that text every later turn, so the real bill-saving
+runs higher. Payoff scales with how log/build/read-heavy your work is.
 NOTE

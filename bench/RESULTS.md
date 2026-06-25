@@ -16,3 +16,19 @@ what fraction of your context is command output / large reads:
 So a session where ~⅓ of context is verbose output lands near ~30% fewer input
 tokens; a build/test-heavy session lands higher. The per-layer reductions above
 are measured and reproducible; the session % is this multiplication, nothing more.
+
+## Session-level saving (measured on real transcripts)
+
+```
+# quiet-bash session saving — measured on 136 real sessions
+#   (threshold 25000 B, glob /Users/yoeld/.claude/projects/*/*.jsonl)
+
+  pooled (all bytes):    13.7%  of context bytes were large tool output quiet-bash collapses
+  median session:         0.0%
+  mean session:           9.7%
+  p75 / p90 session:     13.6% /  30.6%
+  sessions with >0 cut:  55/136
+
+One-time floor (not counting per-turn re-send, which raises it). The
+~99% per-op cut is measured separately by bench/run.sh.
+```

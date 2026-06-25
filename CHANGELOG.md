@@ -25,6 +25,11 @@ All notable changes to this project are documented here. Format follows
     prints the full file; `--section` is byte-exact. Embedded JSON/YAML in a spilled
     section can be queried with `quiet-query.sh` after loading it.
   - Zero-dependency (bash + awk), shellcheck-clean. Six regression tests in the suite.
+- **Measured session-level saving** (`bench/session-savings.py`) — scans real Claude Code
+  transcripts instead of modelling. Across 136 real sessions: **13.7% pooled / median 0% /
+  p90 31%** of context bytes were large tool output quiet-bash collapses (a one-time floor;
+  per-turn re-send raises the real bill-saving). Replaces the optimistic "~30% typical"
+  claim — 30% is the heavy-session case, not typical.
 - **Reproducible benchmark** (`bench/run.sh`) — measures raw bytes vs the bytes
   quiet-bash leaves in context, on real files you point it at (`QB_JSON`/`QB_SRC`/
   `QB_REPO`), and prints the savings table. Committed run in `bench/RESULTS.md`.
