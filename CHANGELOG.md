@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.22.1] — 2026-06-25
+
+### Fixed
+- **Claude Code adapter was a silent no-op on current Claude Code (v2.1.x).** Claude Code
+  only applies a PreToolUse `updatedInput` rewrite when the hook *also* returns
+  `permissionDecision: "allow"` as a sibling field; without it the rewrite is dropped and
+  the original (verbose) command runs. `adapters/claude-code.sh` now emits
+  `permissionDecision: "allow"`, so command quieting actually takes effect again. Caught by
+  the new agentic benchmark (`bench/agentic.sh`), which measured ~no difference until the
+  fix. Only commands quiet-bash chooses to wrap are auto-allowed; non-matching commands
+  print nothing and follow the normal permission flow.
+
 ## [1.22.0] — 2026-06-25
 
 ### Added
