@@ -12,9 +12,13 @@ All notable changes to this project are documented here. Format follows
   `core/quiet-result.sh`, the same summarizer the Claude Code adapter and MCP
   proxy use). Small and non-bash results pass through. Validated against the real
   OpenCode plugin API (100 KB → 552-char summary; small + non-bash untouched).
-  Node-gated test in the suite; install via `.opencode/plugin/`. (opencode↔Ollama
-  chat was confirmed live, but a local 7b model didn't reliably emit tool calls to
-  trigger the hook end-to-end — a model limitation, not the adapter.)
+  Node-gated test in the suite. **Install: register the adapter path in
+  `opencode.json` `"plugin"`** (dir auto-discovery does not load it). Confirmed
+  live end-to-end in a real OpenCode session with a capable model: the hook fired
+  on a bash result and a 10 KB output became a 657-char summary (full output
+  spilled). Small local models (7B over Ollama OpenAI-compat) may text-dump tool
+  calls instead of invoking them, so the hook never fires — use a tool-calling
+  model.
 
 ## [1.20.0] — 2026-06-25
 

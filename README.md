@@ -417,20 +417,25 @@ Then add a `preToolUse` hook in `.github/hooks/quiet-bash.json` running
 
 ### OpenCode
 
-OpenCode loads a native plugin via its `tool.execute.after` hook. Copy or symlink
-the adapter into your project's plugin dir:
+OpenCode loads a native plugin via its `tool.execute.after` hook. **Register it
+in your `opencode.json`** (dir auto-discovery does *not* load it — registration is
+required):
 
-```bash
-mkdir -p .opencode/plugin
-ln -s "$(pwd)/adapters/opencode.mjs" .opencode/plugin/quiet-bash.mjs
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["/abs/path/to/quiet-bash/adapters/opencode.mjs"]
+}
 ```
 
 It quiets large `bash` tool results (spill + summary, reusing the same
 `core/quiet-result.sh` summarizer); small and non-bash results pass through.
-Validated against OpenCode's real `tool.execute.after` plugin API (100 KB →
-552-char summary). Requires `bash` + `jq` on PATH. (Note: a live run needs a
-model that reliably emits tool calls — small local models over Ollama's
-OpenAI-compatible endpoint may text-dump tool calls instead of invoking them.)
+**Confirmed live end-to-end** in a real OpenCode session: a capable model ran a
+verbose command, the hook fired, and a 10 KB result became a 657-char
+`[quiet-bash]` summary with the full output spilled byte-exact. Requires `bash` +
+`jq` on PATH. Note: small local models (e.g. 7B over Ollama's OpenAI-compatible
+endpoint) may *text-dump* tool calls instead of invoking them, so the hook never
+fires — use a model with reliable tool-calling.
 
 ### Cursor, Aider, Windsurf, Cline, or any shell (universal)
 
