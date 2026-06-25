@@ -18,7 +18,7 @@
   <a href="#supported-agents">Works with Claude Code · Codex · Gemini · Copilot · Cursor · Aider · any shell</a> ·
   <a href="#how-much-it-saves">Savings</a> ·
   <a href="docs/token-savings-research.md">Research</a> ·
-  <a href="docs/graph-options.md">Graph options</a> ·
+  <a href="docs/comparison.md">Comparison</a> ·
   <a href="examples/before-after.md">Examples</a> ·
   <a href="LICENSE">MIT</a>
 </p>
