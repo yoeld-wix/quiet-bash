@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [1.20.0] — 2026-06-25
+
+### Added
+- **`minimal-change` skill** — original guidance (inspired by, not copied from,
+  the MIT **ponytail** project) for the *output* side: write the smallest correct
+  change (reuse before rewrite, stdlib/installed deps before new ones, fewest
+  lines) to cut generated code — which is the 3–5×-priced, serially-generated
+  half of cost. Leads with a **no-regression floor** (never trim validation,
+  security, error handling, tests, or anything requested). A 3-vs-3 subagent A/B
+  measured ~45% less solution code with no correctness regression; the baseline
+  arm *added* unrequested work. Credits ponytail and points users to it for the
+  dedicated always-on cross-agent version (the two stack: quiet-bash input +
+  minimal-change/ponytail output).
+
 ## [1.19.0] — 2026-06-25
 
 ### Added

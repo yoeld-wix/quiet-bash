@@ -361,6 +361,15 @@ printf '%s' "$out" | grep -qE 'same line  \(x3\)' && pass "quiet-tail folds cons
 [ -z "$("$QT" "$TT/nope" 40)" ] && pass "quiet-tail missing file → empty" || bad "quiet-tail missing file"
 rm -rf "$TT"
 
+echo "== minimal-change skill =="
+MC="$ROOT/skills/minimal-change/SKILL.md"
+[ -f "$MC" ] && pass "minimal-change SKILL.md exists" || bad "minimal-change missing"
+head -1 "$MC" | grep -q '^---$' && pass "minimal-change frontmatter fence" || bad "minimal-change fence"
+grep -q '^name: minimal-change$' "$MC" && pass "minimal-change has name" || bad "minimal-change name"
+grep -qE '^description: .+' "$MC" && pass "minimal-change has description" || bad "minimal-change description"
+grep -qi 'no-regression floor' "$MC" && pass "minimal-change has no-regression floor" || bad "minimal-change floor"
+{ grep -qi 'inspired by' "$MC" && grep -qi 'ponytail' "$MC"; } && pass "minimal-change credits ponytail" || bad "minimal-change attribution"
+
 echo "== concise output style =="
 OS="$ROOT/output-styles/concise.md"
 [ -f "$OS" ] && pass "concise output-style exists" || bad "output-style missing"

@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v1.19.0-1fb588" alt="release">
+  <img src="https://img.shields.io/badge/release-v1.20.0-1fb588" alt="release">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   <img src="https://img.shields.io/badge/works%20with-7%20agents-1fb588" alt="works with 7 agents">
   <img src="https://img.shields.io/badge/command%20output-−99.9%25-e8836b" alt="command output reduced 99.9%">
@@ -277,6 +277,17 @@ In a 10-agent A/B it measured **~10% faster responses** (median 4.0 s vs 4.5 s)
 and ~10–15% smaller output, **with no content lost**. It's **opt-in** (it won't
 hijack your style): enable via `/config` → **Output style** → **Concise**, or set
 `"outputStyle": "Concise"` in settings.
+
+### Bonus: the `minimal-change` skill (write less code)
+
+A skill (`skills/minimal-change/`) for the output side's biggest lever — *less
+code generated*. It steers toward the smallest correct change (reuse before
+rewrite, stdlib/installed deps before new ones, fewest lines) with a strict
+**no-regression floor** (never trim validation, security, error handling, tests).
+A 3-vs-3 A/B measured **~45% less solution code, no correctness loss**. Inspired
+by the open-source **[ponytail](https://github.com/DietrichGebert/ponytail)**
+project (MIT) — install it too for the dedicated, always-on, cross-agent version;
+the two stack (quiet-bash trims input, this trims output).
 
 ## Supported agents
 

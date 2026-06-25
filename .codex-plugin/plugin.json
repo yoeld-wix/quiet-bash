@@ -1,5 +1,5 @@
 {
   "name": "quiet-bash",
-  "version": "1.19.0",
+  "version": "1.20.0",
   "description": "Quiets noisy command output (builds, tests, big git diffs) so it doesn't fill the agent's context window."
 }
