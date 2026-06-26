@@ -29,32 +29,28 @@ OUT="${ME_OUT:-$ROOT/bench/model-economy-runs.jsonl}"
 ARMS="${ME_ARMS:-baseline A}"
 : > "$OUT"
 
-# Per-arm environment. baseline: no override. A: force subagents to haiku alias.
-arm_env() { # arm -> prints "VAR=value" lines for `env`
-  case "$1" in
-    A) printf 'CLAUDE_CODE_SUBAGENT_MODEL=haiku\n' ;;
-    B) printf 'CLAUDE_CODE_SUBAGENT_MODEL=haiku\n' ;;  # placeholder; B uses the hook, wired later
-    *) : ;;
-  esac
-}
-
 run_one() { # arm task_idx rep
   local arm="$1" ti="$2" rep="$3" task="${ME_TASK_PROMPTS[$2]}"
-  local envfile j answer grade
-  envfile="$(arm_env "$arm")"
-  j=$(cd "$TARGET" && env $(printf '%s ' $envfile) timeout 300 \
+  local j answer grade envcmd
+  case "$arm" in
+    baseline) envcmd=(env -u CLAUDE_CODE_SUBAGENT_MODEL) ;;
+    A)        envcmd=(env CLAUDE_CODE_SUBAGENT_MODEL=haiku) ;;
+    B)        envcmd=(env CLAUDE_CODE_SUBAGENT_MODEL=haiku) ;;  # placeholder; B uses the hook, wired later
+    *)        envcmd=(env) ;;
+  esac
+  j=$(cd "$TARGET" && "${envcmd[@]}" timeout 300 \
         claude -p "$task" --model "$MODEL" --output-format json \
         --allowedTools "Task" "Bash" "Read" "Grep" "Glob" 2>/dev/null)
   [ -z "$j" ] && { echo "  ! ${arm} task${ti} rep${rep}: no output" >&2; return; }
   answer=$(printf '%s' "$j" | jq -r '.result // ""')
   grade=$(me_grade "$ti" "$answer")
-  printf '%s\n' "$j" | python3 -c "
-import sys,json
+  printf '%s\n' "$j" | ME_ARM="$arm" ME_TI="$ti" ME_REP="$rep" ME_GRADE="$grade" python3 -c "
+import sys,json,os
 o=json.load(sys.stdin); u=o.get('usage',{}) or {}
 inp=(u.get('input_tokens',0) or 0)+(u.get('cache_read_input_tokens',0) or 0)+(u.get('cache_creation_input_tokens',0) or 0)
-rec={'arm':'$arm','task':$ti,'rep':$rep,'input':inp,'output':u.get('output_tokens',0) or 0,
-     'cost':o.get('total_cost_usd',0) or 0,'ms':o.get('duration_ms',0) or 0,
-     'turns':o.get('num_turns',0),'pass':('$grade'=='pass')}
+rec={'arm':os.environ['ME_ARM'],'task':int(os.environ['ME_TI']),'rep':int(os.environ['ME_REP']),
+     'input':inp,'output':u.get('output_tokens',0) or 0,'cost':o.get('total_cost_usd',0) or 0,
+     'ms':o.get('duration_ms',0) or 0,'turns':o.get('num_turns',0),'pass':(os.environ['ME_GRADE']=='pass')}
 print(json.dumps(rec))
 " >> "$OUT"
   echo "  ${grade} ${arm} task${ti} rep${rep}" >&2
