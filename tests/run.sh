@@ -133,9 +133,14 @@ fi
 
 echo "== tool-result optimization (Claude Code PostToolUse) =="
 MCP="$ROOT/adapters/claude-code-result.sh"
+# Big payloads are fed to jq via --rawfile, not --arg: Linux caps a single argv
+# entry at 128KB (MAX_ARG_STRLEN), so passing ~200KB strings on the CLI fails
+# with "Argument list too long" on the CI runner (macOS has no per-arg cap).
+MT=$(mktemp -d)
 # large JSON result → replaced with a collapsed summary
 bigjson=$(jq -nc '{items:[range(3000)|{id:.,name:"pkg",version:"1.0.0",url:"https://example.com/x"}]}')
-pj=$(jq -n --arg t "$bigjson" '{tool_name:"mcp__search__query", tool_response:{content:[{type:"text",text:$t}]}}')
+printf '%s' "$bigjson" > "$MT/bigjson"
+pj=$(jq -n --rawfile t "$MT/bigjson" '{tool_name:"mcp__search__query", tool_response:{content:[{type:"text",text:$t}]}}')
 oj=$(printf '%s' "$pj" | "$MCP")
 rep=$(printf '%s' "$oj" | jq -r '.hookSpecificOutput.updatedToolOutput.content[0].text' 2>/dev/null)
 [ -n "$rep" ] && echo "$rep" | grep -q 'quiet-bash' && pass "large JSON MCP result replaced" || bad "mcp json replace"
@@ -143,41 +148,45 @@ rep=$(printf '%s' "$oj" | jq -r '.hookSpecificOutput.updatedToolOutput.content[0
 echo "$rep" | grep -q 'more of 3000' && pass "mcp json collapses repeated shape" || bad "mcp json collapse"
 # large TEXT result → spilled with head/tail
 bigtext=$(for i in $(seq 1 4000); do echo "log line $i: something happened here with detail"; done)
-pt=$(jq -n --arg t "$bigtext" '{tool_name:"mcp__web__fetch", tool_response:{content:[{type:"text",text:$t}]}}')
+printf '%s' "$bigtext" > "$MT/bigtext"
+pt=$(jq -n --rawfile t "$MT/bigtext" '{tool_name:"mcp__web__fetch", tool_response:{content:[{type:"text",text:$t}]}}')
 ot=$(printf '%s' "$pt" | "$MCP" | jq -r '.hookSpecificOutput.updatedToolOutput.content[0].text' 2>/dev/null)
 echo "$ot" | grep -q 'spilled to' && echo "$ot" | grep -q 'first 20 lines' && pass "large text MCP result spilled + head/tail" || bad "mcp text spill"
 # small result → pass through (no output)
 ps=$(jq -n '{tool_name:"mcp__x__y", tool_response:{content:[{type:"text",text:"tiny result"}]}}')
 [ -z "$(printf '%s' "$ps" | "$MCP")" ] && pass "small MCP result passes through" || bad "mcp small passthrough"
 # already-wrapped → no double wrap
-pw=$(jq -n --arg t "[quiet-mcp] already done $bigtext" '{tool_name:"mcp__x__y", tool_response:{content:[{type:"text",text:$t}]}}')
+printf '[quiet-mcp] already done %s' "$bigtext" > "$MT/wrapped"
+pw=$(jq -n --rawfile t "$MT/wrapped" '{tool_name:"mcp__x__y", tool_response:{content:[{type:"text",text:$t}]}}')
 [ -z "$(printf '%s' "$pw" | "$MCP")" ] && pass "no double-wrap of quiet-mcp output" || bad "mcp double-wrap guard"
 # non-text content (image) → pass through
 pi=$(jq -n '{tool_name:"mcp__x__y", tool_response:{content:[{type:"image",data:"AAAA"}]}}')
 [ -z "$(printf '%s' "$pi" | "$MCP")" ] && pass "non-text MCP content passes through" || bad "mcp non-text passthrough"
 # NON-MCP tool with a STRING result (e.g. WebFetch) → replaced, mirroring string shape
 bigstr=$(for i in $(seq 1 4000); do echo "fetched paragraph $i with a fair amount of text in it"; done)
-pstr=$(jq -n --arg t "$bigstr" '{tool_name:"WebFetch", tool_response:$t}')
+printf '%s' "$bigstr" > "$MT/bigstr"
+pstr=$(jq -n --rawfile t "$MT/bigstr" '{tool_name:"WebFetch", tool_response:$t}')
 ostr=$(printf '%s' "$pstr" | "$MCP")
 [ "$(printf '%s' "$ostr" | jq -r '.hookSpecificOutput.updatedToolOutput | type')" = "string" ] && pass "string result → string updatedToolOutput (shape mirrored)" || bad "string result shape"
 printf '%s' "$ostr" | jq -r '.hookSpecificOutput.updatedToolOutput' | grep -q 'spilled to' && pass "WebFetch string result spilled" || bad "webfetch spill"
 # unknown shape (object, no content[]) → pass through (safe no-op)
-poth=$(jq -n --arg t "$bigstr" '{tool_name:"Weird", tool_response:{weird:$t}}')
+poth=$(jq -n --rawfile t "$MT/bigstr" '{tool_name:"Weird", tool_response:{weird:$t}}')
 [ -z "$(printf '%s' "$poth" | "$MCP")" ] && pass "unknown result shape passes through" || bad "unknown shape passthrough"
 
 echo "== result optimization: other agents =="
 # Gemini AfterTool: result at .tool_response.llmContent → deny+reason
 GR="$ROOT/adapters/gemini-result.sh"
-pg=$(jq -n --arg t "$bigjson" '{tool_name:"mcp_search_query", tool_response:{llmContent:$t}}')
+pg=$(jq -n --rawfile t "$MT/bigjson" '{tool_name:"mcp_search_query", tool_response:{llmContent:$t}}')
 og=$(printf '%s' "$pg" | "$GR")
 { [ "$(printf '%s' "$og" | jq -r '.decision')" = "deny" ] && printf '%s' "$og" | jq -r '.reason' | grep -q 'quiet-bash'; } && pass "gemini result → deny+reason (collapsed)" || bad "gemini result"
 [ -z "$(printf '%s' "$(jq -n '{tool_name:"x", tool_response:{llmContent:"tiny"}}')" | "$GR")" ] && pass "gemini small passes through" || bad "gemini small"
 # Copilot postToolUse: result at .toolResult.textResultForLlm → modifiedResult
 CR="$ROOT/adapters/copilot-result.sh"
-pc=$(jq -n --arg t "$bigjson" '{toolName:"mcp_search_query", toolResult:{resultType:"success", textResultForLlm:$t}}')
+pc=$(jq -n --rawfile t "$MT/bigjson" '{toolName:"mcp_search_query", toolResult:{resultType:"success", textResultForLlm:$t}}')
 oc=$(printf '%s' "$pc" | "$CR")
 { [ "$(printf '%s' "$oc" | jq -r '.modifiedResult.resultType')" = "success" ] && printf '%s' "$oc" | jq -r '.modifiedResult.textResultForLlm' | grep -q 'quiet-bash'; } && pass "copilot result → modifiedResult success" || bad "copilot result"
 [ -z "$(printf '%s' "$(jq -n '{toolName:"x", toolResult:{resultType:"success", textResultForLlm:"tiny"}}')" | "$CR")" ] && pass "copilot small passes through" || bad "copilot small"
+rm -rf "$MT"
 
 echo "== quiet-query (smart query / aggregation) =="
 QQ="$ROOT/core/quiet-query.sh"
