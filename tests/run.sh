@@ -474,5 +474,15 @@ done
 grep -q 'quiet-agg' "$SK" 2>/dev/null && grep -q 'quiet-verify' "$SK" 2>/dev/null \
   && pass "skill references the verbs" || bad "skill references verbs"
 
+echo "== composition: spill -> recover with a verb =="
+. "$ROOT/core/quiet-core.sh"
+# Run a command whose output quiet_run spills to a temp log, then recover the
+# answer from that spill with a verb — without re-reading the haystack.
+SPILL_MSG=$(quiet_run printf 'WARN a\nERROR boom\nWARN b\n')
+LOG=$(printf '%s' "$SPILL_MSG" | grep -oE "${QUIET_LOG_DIR%/}/+${QUIET_LOG_PREFIX}[A-Za-z0-9]+" | head -1)
+{ [ -n "$LOG" ] && [ -f "$LOG" ]; } && pass "spill log created" || bad "spill log created"
+"$ROOT/core/quiet-verify.sh" "$LOG" 'ERROR' >/dev/null && pass "recover: verify hit on spill" || bad "recover: verify"
+"$ROOT/core/quiet-agg.sh" "$LOG" 'WARN|ERROR' | grep -q 'WARN' && pass "recover: agg on spill" || bad "recover: agg"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
