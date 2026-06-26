@@ -73,6 +73,7 @@ shell, see **[Install](#install)**.
   - [Large tool results (MCP, WebFetch, WebSearch)](#large-tool-results-mcp-webfetch-websearch)
   - [Output side: `Concise` style](#output-side-concise-style)
   - [Output side: `minimal-change` skill](#output-side-minimal-change-skill)
+  - [Output side: `minimal-docs` skill](#output-side-minimal-docs-skill)
   - [Prompt quieting (`quiet-prompt`)](#prompt-quieting-quiet-prompt)
 - [Supported agents](#supported-agents)
 - [Install](#install)
@@ -386,6 +387,16 @@ floor** (never trim validation, security, error handling, tests). A 3-vs-3 A/B m
 **[ponytail](https://github.com/DietrichGebert/ponytail)** project (MIT) — install it
 too for the dedicated, always-on, cross-agent version; the two stack (quiet-bash trims
 input, this trims output).
+
+### Output side: `minimal-docs` skill
+
+The prose sibling of `minimal-change` (`skills/minimal-docs/`): *fewer rows in the
+markdown the agent writes* — READMEs, `docs/`, specs, CHANGELOG, PR descriptions. It
+steers toward link-don't-duplicate, one example over three, table over paragraph, and
+cutting filler, with the same strict **no-regression floor** foremost (never drop
+install steps, warnings, accuracy, or copy-pasteable commands). Distinct from the
+`Concise` style, which governs chat responses rather than files on disk. Opt-in, and it
+dogfoods its own rule.
 
 ### Prompt quieting (`quiet-prompt`)
 
