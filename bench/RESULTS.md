@@ -59,3 +59,4 @@ deterministic regex.
 Gate: arm A ships only if **pass-rate == baseline (zero regression)** AND mean
 cost is lower. Paste the printed table here after running. A "DO NOT SHIP"
 verdict (regression, or no savings) is itself a valid, publishable result.
+Note: arms A/B only differ when the agent actually delegates to a subagent — when pasting results, confirm delegation occurred (check `num_turns` / the transcript); a 'no savings' result with no delegation is a measurement artifact, not a finding.

@@ -497,6 +497,9 @@ else bad "grade: correct answer for task0 should pass"; fi
 if [ "$(me_grade 0 'I could not find anything relevant')" = fail ]; then
   pass "grade: wrong answer for task0 → fail"
 else bad "grade: wrong answer for task0 should fail"; fi
+if [ "$(me_grade 99 'anything at all')" = fail ]; then
+  pass "grade: out-of-range index → fail (no silent pass)"
+else bad "grade: out-of-range index must fail, not silently pass"; fi
 # every task must have an index-aligned assertion
 if [ "${#ME_TASK_PROMPTS[@]}" -eq "${#ME_TASK_ASSERTS[@]}" ] && [ "${#ME_TASK_PROMPTS[@]}" -gt 0 ]; then
   pass "suite: prompts and asserts are aligned and non-empty"

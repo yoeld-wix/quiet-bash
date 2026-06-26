@@ -15,7 +15,7 @@ for r in rows:
 
 def mean(x): return statistics.mean(x) if x else 0.0
 
-arms = [a for a in ("baseline", "A", "B") if by[a]["input"]]
+arms = [a for a in ("baseline", "A", "B") if by[a]["input"]]  # arms outside this tuple are ignored in the table/verdict
 print("# quiet-bash model-economy benchmark — mean per run")
 print("| arm | input tok | output tok | cost $ | time s | pass-rate | runs |")
 print("|---|--:|--:|--:|--:|--:|--:|")

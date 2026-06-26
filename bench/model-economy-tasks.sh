@@ -23,7 +23,8 @@ ME_TASK_ASSERTS=(
 
 # me_grade <task_index> <answer_text> -> echoes pass|fail, returns 0|1
 me_grade() {
-  local idx="$1" answer="$2" rx="${ME_TASK_ASSERTS[$1]}"
-  if printf '%s' "$answer" | grep -Eiq "$rx"; then echo pass; return 0; fi
+  local rx="${ME_TASK_ASSERTS[$1]:-}"
+  [ -z "$rx" ] && { echo fail; return 1; }
+  if printf '%s' "$2" | grep -Eiq "$rx"; then echo pass; return 0; fi
   echo fail; return 1
 }
