@@ -129,6 +129,38 @@ only.**
   flag, because its precision is low. The spec documents the regression boundary
   so a future contributor doesn't "upgrade" it into a rewrite.
 
+### 3.1 Empirical check — A/B/C subagent test (2026-06-26)
+
+The recommendation above was validated by a controlled subagent experiment: four
+arms (control / A skill / B advisory / C verbs) given an identical find+count+
+verify task over a 6,001-line log with known ground truth, scored on *did the arm
+pipe for the answer (not read the haystack) and get it right*. Run on a strong
+model (Opus) and a weak model (Haiku). Caveat: n=1 per arm per model, and weak-
+model self-reported approaches may be partly confabulated — but final-answer
+correctness is checked against ground truth.
+
+- **Strong model: ceiling effect.** All arms piped, read nothing, answered
+  correctly. No mechanism added value; **C cost slightly more** (extra verb call).
+  → On capable models doing obviously-mechanical work, this whole lever is
+  near-free insurance, not a saver.
+- **Weak model: the discriminating run.**
+  - **Control** answered correctly but floundered (14 tool calls, trial-and-error
+    after a fumbled `grep -c`).
+  - **B (advisory)** produced a **wrong answer** — the vague nudge gave no reliable
+    mechanism and it didn't recover. Confirms: do not ship B.
+  - **A (skill)** answered correctly in fewer calls; the cheatsheet let it recover
+    from the same fumble.
+  - **C (verbs)** answered correctly and *skipped the trap entirely* — the verb
+    encapsulates the correct pipeline so the weaker model couldn't fumble it.
+
+**Consequence for this spec:** the recommendation (A core + minimal C, defer B)
+holds, with one rationale **sharpened** — see §4.2. The verbs are not merely an
+ergonomics convenience; on weaker/cheaper models they are **correctness
+insurance**, which is exactly the regime you run to save cost.
+
+Raw arm outputs are in the session transcript; the fixture generator is in §6's
+bench scenario.
+
 ---
 
 ## 4. Design
@@ -186,8 +218,12 @@ precisely to keep injected prompts out of the per-turn bill.)
 ### 4.2 Component C — minimal deterministic verbs
 
 Ship in `core/`, mirroring `quiet-query.sh`. Only verbs that clear the bar
-*"the pipeline is gnarly enough that agents avoid it and read instead."* Initial
-set — to be cut further if any one fails that test during implementation:
+*"the pipeline is gnarly enough that agents avoid it and read instead."* The
+A/B/C test (§3.1) added a second, stronger reason: on weaker models the verb is
+**correctness insurance** — it encapsulates the right pipeline so the model
+can't fumble it (the bare-`grep` arms produced wrong/floundering results where
+the verb arm answered cleanly in one shot). Initial set — to be cut further if
+any one fails the "agents avoid it" test during implementation:
 
 - **`quiet-verify`** — `quiet-verify <file> <pattern>` → prints `OK`/`FAIL` + the
   match count, exit code reflects it. Wraps the
@@ -207,7 +243,9 @@ operates on a path (typically a quiet-bash spill) — never swallowing data.
 
 ### 4.3 Component B — advisory hook (deferred, bounded)
 
-Documented but **not shipped in v1**. If pursued: a PostToolUse observation that,
+Documented but **not shipped in v1** — the A/B/C test (§3.1) found a bare advisory
+nudge produced a *wrong* answer on a weak model, reinforcing the deferral. If
+pursued: a PostToolUse observation that,
 on detecting a high-confidence read-to-find signal (e.g. ≥3 sequential `Read`s of
 the same directory in a window), appends a single non-blocking line: *"tip:
 `rg -l PAT <dir>` answers this in one call."* Hard rules for any future
