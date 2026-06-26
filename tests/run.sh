@@ -379,6 +379,15 @@ grep -qE '^description: .+' "$MC" && pass "minimal-change has description" || ba
 grep -qi 'no-regression floor' "$MC" && pass "minimal-change has no-regression floor" || bad "minimal-change floor"
 { grep -qi 'inspired by' "$MC" && grep -qi 'ponytail' "$MC"; } && pass "minimal-change credits ponytail" || bad "minimal-change attribution"
 
+echo "== minimal-docs skill =="
+MD="$ROOT/skills/minimal-docs/SKILL.md"
+[ -f "$MD" ] && pass "minimal-docs SKILL.md exists" || bad "minimal-docs missing"
+head -1 "$MD" | grep -q '^---$' && pass "minimal-docs frontmatter fence" || bad "minimal-docs fence"
+grep -q '^name: minimal-docs$' "$MD" && pass "minimal-docs has name" || bad "minimal-docs name"
+grep -qE '^description: .+' "$MD" && pass "minimal-docs has description" || bad "minimal-docs description"
+grep -qi 'no-regression floor' "$MD" && pass "minimal-docs has no-regression floor" || bad "minimal-docs floor"
+{ grep -qi 'inspired by' "$MD" && grep -qi 'ponytail' "$MD"; } && pass "minimal-docs credits ponytail" || bad "minimal-docs attribution"
+
 echo "== concise output style =="
 OS="$ROOT/output-styles/concise.md"
 [ -f "$OS" ] && pass "concise output-style exists" || bad "output-style missing"
