@@ -517,6 +517,9 @@ else bad "report: should report zero-regression when pass-rates match"; fi
 if printf '%s' "$me_rep" | grep -Eq "cost -[0-9]"; then
   pass "report: cheaper A arm → negative cost delta"
 else bad "report: should show negative cost delta for cheaper arm"; fi
+if printf '%s' "$me_rep" | grep -Eq "arm A:.*→ SHIP"; then
+  pass "report: zero-regression + cheaper → SHIP verdict"
+else bad "report: cheaper zero-regression arm should yield SHIP"; fi
 rm -f "$me_tmp"
 
 echo

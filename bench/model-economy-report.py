@@ -33,7 +33,10 @@ for a in arms:
     pr = mean(by[a]["pass"]) * 100
     cost = mean(by[a]["cost"])
     regress = "ZERO-REGRESSION ✓" if pr >= base_pr else "ZERO-REGRESSION ✗"
-    cost_delta = (100 * (cost - base_cost) / base_cost) if base_cost else 0.0
+    if base_cost:
+        cost_str = f"cost {100*(cost-base_cost)/base_cost:+.1f}%"
+    else:
+        cost_str = "cost n/a"
     verdict = "SHIP" if (pr >= base_pr and cost < base_cost) else "DO NOT SHIP"
     print(f"**arm {a}: {regress} (pass {pr:.0f}% vs baseline {base_pr:.0f}%), "
-          f"cost {cost_delta:+.1f}% → {verdict}** (negative cost = cheaper).")
+          f"{cost_str} → {verdict}** (negative cost = cheaper).")
