@@ -394,9 +394,11 @@ The prose sibling of `minimal-change` (`skills/minimal-docs/`): *fewer rows in t
 markdown the agent writes* — READMEs, `docs/`, specs, CHANGELOG, PR descriptions. It
 steers toward link-don't-duplicate, one example over three, table over paragraph, and
 cutting filler, with the same strict **no-regression floor** foremost (never drop
-install steps, warnings, accuracy, or copy-pasteable commands). Distinct from the
-`Concise` style, which governs chat responses rather than files on disk. Opt-in, and it
-dogfoods its own rule.
+install steps, warnings, accuracy, or copy-pasteable commands). A 4-case subagent A/B
+(CLI README, API reference, security guide, troubleshooting) measured **~51% fewer rows
+with 100% of required items retained** — and clarity *improved*, as prose collapsed into
+scannable tables. Distinct from the `Concise` style, which governs chat responses rather
+than files on disk. Opt-in, and it dogfoods its own rule.
 
 ### Prompt quieting (`quiet-prompt`)
 
