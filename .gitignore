@@ -1,3 +1,4 @@
 bench/*-runs.jsonl
 bench/*.log
 bench/agentic*-report.md
+.superpowers/
