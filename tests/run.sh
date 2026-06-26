@@ -488,5 +488,19 @@ LOG=$(printf '%s' "$SPILL_MSG" | grep -oE "${QUIET_LOG_DIR%/}/+${QUIET_LOG_PREFI
 "$ROOT/core/quiet-verify.sh" "$LOG" 'ERROR' >/dev/null && pass "recover: verify hit on spill" || bad "recover: verify"
 "$ROOT/core/quiet-agg.sh" "$LOG" 'WARN|ERROR' | grep -q 'WARN' && pass "recover: agg on spill" || bad "recover: agg"
 
+echo "== model-economy: grading =="
+. "$ROOT/bench/model-economy-tasks.sh"
+# task 0 asserts the answer mentions the known symbol; grade pass/fail on canned answers
+if [ "$(me_grade 0 'The function is exported as quiet_rewrite in quiet-core.sh')" = pass ]; then
+  pass "grade: correct answer for task0 → pass"
+else bad "grade: correct answer for task0 should pass"; fi
+if [ "$(me_grade 0 'I could not find anything relevant')" = fail ]; then
+  pass "grade: wrong answer for task0 → fail"
+else bad "grade: wrong answer for task0 should fail"; fi
+# every task must have an index-aligned assertion
+if [ "${#ME_TASK_PROMPTS[@]}" -eq "${#ME_TASK_ASSERTS[@]}" ] && [ "${#ME_TASK_PROMPTS[@]}" -gt 0 ]; then
+  pass "suite: prompts and asserts are aligned and non-empty"
+else bad "suite: prompts/asserts misaligned or empty"; fi
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
