@@ -502,5 +502,22 @@ if [ "${#ME_TASK_PROMPTS[@]}" -eq "${#ME_TASK_ASSERTS[@]}" ] && [ "${#ME_TASK_PR
   pass "suite: prompts and asserts are aligned and non-empty"
 else bad "suite: prompts/asserts misaligned or empty"; fi
 
+echo "== model-economy: report =="
+me_tmp="$(mktemp)"
+cat > "$me_tmp" <<'JSONL'
+{"arm":"baseline","task":0,"rep":1,"input":1000,"output":50,"cost":0.02,"ms":4000,"turns":3,"pass":true}
+{"arm":"baseline","task":1,"rep":1,"input":1200,"output":60,"cost":0.03,"ms":4200,"turns":3,"pass":true}
+{"arm":"A","task":0,"rep":1,"input":1000,"output":50,"cost":0.01,"ms":3000,"turns":3,"pass":true}
+{"arm":"A","task":1,"rep":1,"input":1200,"output":60,"cost":0.015,"ms":3100,"turns":3,"pass":true}
+JSONL
+me_rep="$(python3 "$ROOT/bench/model-economy-report.py" "$me_tmp")"
+if printf '%s' "$me_rep" | grep -q "ZERO-REGRESSION ✓"; then
+  pass "report: equal pass-rate → zero-regression ✓"
+else bad "report: should report zero-regression when pass-rates match"; fi
+if printf '%s' "$me_rep" | grep -Eq "cost -[0-9]"; then
+  pass "report: cheaper A arm → negative cost delta"
+else bad "report: should show negative cost delta for cheaper arm"; fi
+rm -f "$me_tmp"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
