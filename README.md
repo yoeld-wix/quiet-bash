@@ -48,7 +48,7 @@ It quiets the **four things that bloat an agent's context**:
 - **Lossless** — the full output stays byte-exact on disk, one `jq` / `grep` / `Read`-range away. Nothing is hidden on failure (you still get the cleaned error tail).
 - **Works with 8 agents** — Claude Code · Codex · Gemini · Copilot · Cursor · Aider · OpenCode · or any shell (via PATH shims / wrapper).
 - **Zero dependencies** — just `bash` + `jq`. No daemon, no model, no network call.
-- **Output side too** *(opt-in)* — a `Concise` style and a `minimal-change` skill trim generated tokens and code; stacks with [ponytail](https://github.com/DietrichGebert/ponytail).
+- **Output side too** *(opt-in)* — a `Concise` style plus `minimal-change` (code) and `minimal-docs` (markdown) skills trim generated tokens; stacks with [ponytail](https://github.com/DietrichGebert/ponytail).
 
 ## Quickstart
 
@@ -73,6 +73,7 @@ shell, see **[Install](#install)**.
   - [Large tool results (MCP, WebFetch, WebSearch)](#large-tool-results-mcp-webfetch-websearch)
   - [Output side: `Concise` style](#output-side-concise-style)
   - [Output side: `minimal-change` skill](#output-side-minimal-change-skill)
+  - [Output side: `minimal-docs` skill](#output-side-minimal-docs-skill)
   - [Prompt quieting (`quiet-prompt`)](#prompt-quieting-quiet-prompt)
 - [Supported agents](#supported-agents)
 - [Install](#install)
@@ -160,14 +161,15 @@ across-the-board win.
   </picture>
 </p>
 
-The hooks cut **input**. Two opt-in guidance pieces cut **output** — the half priced
+The hooks cut **input**. Three opt-in guidance pieces cut **output** — the half priced
 **3–5×** input and generated **serially** (the latency bottleneck). Measured in
-subagent A/Bs (N=5):
+subagent A/Bs:
 
 | Lever | Effect | No regression? |
 |---|--:|---|
 | `Concise` output style | **~10% faster**, ~10–15% less output | content preserved |
 | `minimal-change` skill | **~45% less code** | correctness preserved |
+| `minimal-docs` skill | **~51% fewer rows, ~43% fewer output tokens** | required detail retained, clarity improved |
 | **Both, on a coding turn** | **~30% → ~49% faster, ~16% fewer tokens** | suppresses scope-creep |
 
 <sub>Input cuts are measured + reproducible ([`bench/run.sh`](bench/run.sh)). These
@@ -386,6 +388,18 @@ floor** (never trim validation, security, error handling, tests). A 3-vs-3 A/B m
 **[ponytail](https://github.com/DietrichGebert/ponytail)** project (MIT) — install it
 too for the dedicated, always-on, cross-agent version; the two stack (quiet-bash trims
 input, this trims output).
+
+### Output side: `minimal-docs` skill
+
+The prose sibling of `minimal-change` (`skills/minimal-docs/`): *fewer rows in the
+markdown the agent writes* — READMEs, `docs/`, specs, CHANGELOG, PR descriptions. It
+steers toward link-don't-duplicate, one example over three, table over paragraph, and
+cutting filler, with the same strict **no-regression floor** foremost (never drop
+install steps, warnings, accuracy, or copy-pasteable commands). A 4-case subagent A/B
+(CLI README, API reference, security guide, troubleshooting) measured **~51% fewer rows
+with 100% of required items retained** — and clarity *improved*, as prose collapsed into
+scannable tables. Distinct from the `Concise` style, which governs chat responses rather
+than files on disk. Opt-in, and it dogfoods its own rule.
 
 ### Prompt quieting (`quiet-prompt`)
 
