@@ -436,5 +436,18 @@ nf="$QPD/n.md"; { echo "# N"; echo "## Rules"; for i in $(seq 1 300); do echo "r
 [ "$("$QP" "$nf" | grep -c 'rule line')" -eq 300 ] && pass "quiet-prompt passes through when nothing tagged [ref]" || bad "quiet-prompt quieted untagged prompt"
 rm -rf "$QPD"
 
+echo "== quiet-verify =="
+QV="$ROOT/core/quiet-verify.sh"
+VF=$(mktemp); printf 'build ok\nPASS test_a\nPASS test_b\n' > "$VF"
+out=$("$QV" "$VF" 'PASS'); st=$?
+{ [ "$st" -eq 0 ] && printf '%s' "$out" | grep -q 'OK' && printf '%s' "$out" | grep -q '2 line'; } \
+  && pass "quiet-verify hit: OK + count + exit 0" || bad "quiet-verify hit"
+out=$("$QV" "$VF" 'FAILURE'); st=$?
+{ [ "$st" -eq 1 ] && printf '%s' "$out" | grep -q 'FAIL'; } \
+  && pass "quiet-verify miss: FAIL + exit 1" || bad "quiet-verify miss"
+"$QV" "$VF" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-verify usage exit 2" || bad "quiet-verify usage"
+"$QV" /no/such/file 'x' >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-verify missing-file exit 2" || bad "quiet-verify missing-file"
+rm -f "$VF"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
