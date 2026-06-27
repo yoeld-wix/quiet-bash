@@ -436,5 +436,57 @@ nf="$QPD/n.md"; { echo "# N"; echo "## Rules"; for i in $(seq 1 300); do echo "r
 [ "$("$QP" "$nf" | grep -c 'rule line')" -eq 300 ] && pass "quiet-prompt passes through when nothing tagged [ref]" || bad "quiet-prompt quieted untagged prompt"
 rm -rf "$QPD"
 
+echo "== quiet-verify =="
+QV="$ROOT/core/quiet-verify.sh"
+VF=$(mktemp); printf 'build ok\nPASS test_a\nPASS test_b\n' > "$VF"
+out=$("$QV" "$VF" 'PASS'); st=$?
+{ [ "$st" -eq 0 ] && printf '%s' "$out" | grep -q 'OK' && printf '%s' "$out" | grep -q '2 line'; } \
+  && pass "quiet-verify hit: OK + count + exit 0" || bad "quiet-verify hit"
+out=$("$QV" "$VF" 'FAILURE'); st=$?
+{ [ "$st" -eq 1 ] && printf '%s' "$out" | grep -q 'FAIL'; } \
+  && pass "quiet-verify miss: FAIL + exit 1" || bad "quiet-verify miss"
+"$QV" "$VF" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-verify usage exit 2" || bad "quiet-verify usage"
+"$QV" /no/such/file 'x' >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-verify missing-file exit 2" || bad "quiet-verify missing-file"
+"$QV" "$VF" '[' >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-verify invalid regex exit 2" || bad "quiet-verify invalid regex exit 2"
+rm -f "$VF"
+
+echo "== quiet-agg =="
+QA="$ROOT/core/quiet-agg.sh"
+AF=$(mktemp); printf 'E101 boom\nE200 nope\nE101 again\nE101 third\nE200 second\n' > "$AF"
+out=$("$QA" "$AF" 'E[0-9]+')
+# E101 appears 3×, E200 2× — E101 must be the first data row
+top=$(printf '%s' "$out" | grep -E 'E[0-9]+' | grep -v '\[quiet-agg\]' | head -1)
+{ printf '%s' "$top" | grep -q 'E101' && printf '%s' "$top" | grep -q '3'; } \
+  && pass "quiet-agg ranks E101(3) first" || bad "quiet-agg ranking"
+out=$("$QA" "$AF" 'ZZZ'); st=$?
+{ [ "$st" -eq 0 ] && printf '%s' "$out" | grep -q 'no matches'; } \
+  && pass "quiet-agg no-match exit 0" || bad "quiet-agg no-match"
+"$QA" "$AF" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-agg usage exit 2" || bad "quiet-agg usage"
+"$QA" "$AF" 'E[0-9]+' 0 >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-agg n=0 exit 2" || bad "quiet-agg n=0 exit 2"
+"$QA" "$AF" 'E[0-9]+' abc >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-agg n=abc exit 2" || bad "quiet-agg n=abc exit 2"
+"$QA" "$AF" '[' >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-agg invalid regex exit 2" || bad "quiet-agg invalid regex exit 2"
+rm -f "$AF"
+
+echo "== deterministic-first skill =="
+SK="$ROOT/skills/deterministic-first/SKILL.md"
+[ -f "$SK" ] && pass "skill file exists" || bad "skill file exists"
+grep -q '^name: deterministic-first' "$SK" 2>/dev/null && pass "skill name frontmatter" || bad "skill name"
+grep -q '^description: Use before' "$SK" 2>/dev/null && pass "skill description trigger" || bad "skill description"
+for h in 'The decision rule' 'Compose with quiet-bash' 'The no-regression floor'; do
+  grep -qF "$h" "$SK" 2>/dev/null && pass "skill section: $h" || bad "skill section: $h"
+done
+grep -q 'quiet-agg' "$SK" 2>/dev/null && grep -q 'quiet-verify' "$SK" 2>/dev/null \
+  && pass "skill references the verbs" || bad "skill references verbs"
+
+echo "== composition: spill -> recover with a verb =="
+. "$ROOT/core/quiet-core.sh"
+# Run a command whose output quiet_run spills to a temp log, then recover the
+# answer from that spill with a verb — without re-reading the haystack.
+SPILL_MSG=$(quiet_run printf 'WARN a\nERROR boom\nWARN b\n')
+LOG=$(printf '%s' "$SPILL_MSG" | grep -oE "${QUIET_LOG_DIR%/}/+${QUIET_LOG_PREFIX}[A-Za-z0-9]+" | head -1)
+{ [ -n "$LOG" ] && [ -f "$LOG" ]; } && pass "spill log created" || bad "spill log created"
+"$ROOT/core/quiet-verify.sh" "$LOG" 'ERROR' >/dev/null && pass "recover: verify hit on spill" || bad "recover: verify"
+"$ROOT/core/quiet-agg.sh" "$LOG" 'WARN|ERROR' | grep -q 'WARN' && pass "recover: agg on spill" || bad "recover: agg"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

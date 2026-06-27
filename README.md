@@ -41,6 +41,7 @@ It quiets the **four things that bloat an agent's context**:
 | **Large file reads** — `package-lock.json`, a 3,000-line source file | the whole file dumped | value-folded JSON/YAML preview or a signature outline |
 | **Large tool results** — MCP, `WebFetch`/`WebSearch`, API payloads | the whole payload | spilled + a collapsed preview |
 | **Long injected prompts** — big `CLAUDE.md`/`AGENTS.md`, hook prompts | re-sent in full every turn | a short stub; reference loads on demand |
+| **Read-to-find work** — locating, counting, extracting, verifying over files/logs | model reads the haystack into context | `deterministic-first` skill + `quiet-verify`/`quiet-agg` return just the answer |
 
 ## Highlights
 
