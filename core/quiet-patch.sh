@@ -33,6 +33,6 @@ if ! err=$(git apply --check $rev "$tmp" 2>&1); then
   rm -f "$tmp"; exit 1
 fi
 stat=$(git apply --numstat $rev "$tmp" 2>/dev/null | awk '{a+=$1; d+=$2; n++} END{printf "%d file(s), +%d -%d", n, a, d}')
-git apply $rev "$tmp"
+git apply $rev "$tmp" || { echo "[quiet-patch] FAIL — apply failed after check; no changes written"; rm -f "$tmp"; exit 1; }
 echo "[quiet-patch] OK — applied $stat"
 rm -f "$tmp"; exit 0

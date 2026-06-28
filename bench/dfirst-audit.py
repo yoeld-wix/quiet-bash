@@ -18,7 +18,7 @@ import json, glob, os, sys, re
 
 PROBE_RE = re.compile(
     r'(^|\s)(node|python3?|go|rustc|java|ruby|deno|bun|npm|pnpm|yarn|cargo|docker|kubectl)\s+(--version|-v|-version|version)\b'
-    r'|(^|\s)(which|type)\s+\S'
+    r'|(^|;|&&|\|\|)\s*(which|type)\s+\S'
     r'|command\s+-v\s+\S'
 )
 
