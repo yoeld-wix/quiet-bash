@@ -41,6 +41,7 @@ def analyze(fp):
     total = 0          # all text bytes that entered context
     quietable = 0      # bytes in tool results over threshold
     nq = 0             # how many such results
+    fresh = cread = ccreate = 0   # input-token usage, split by cache disposition
     for ln in open(fp, errors="ignore"):
         ln = ln.strip()
         if not ln:
@@ -63,15 +64,23 @@ def analyze(fp):
                 total += text_len(c.get("text"))
             elif isinstance(c, str):
                 total += len(c.encode("utf-8", "ignore"))
-    return total, quietable, nq
+        # cache-hit observability: each assistant turn carries a usage block.
+        u = msg.get("usage") if isinstance(msg, dict) else None
+        if isinstance(u, dict):
+            fresh    += u.get("input_tokens", 0) or 0
+            cread    += u.get("cache_read_input_tokens", 0) or 0
+            ccreate  += u.get("cache_creation_input_tokens", 0) or 0
+    return total, quietable, nq, fresh, cread, ccreate
 
 def main():
     pat = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/.claude/projects/*/*.jsonl")
     files = glob.glob(pat)
     fracs, pooled_total, pooled_quiet, big = [], 0, 0, 0
+    p_fresh = p_cread = p_ccreate = 0          # pooled cache-hit tallies
+    hit_fracs = []                             # per-session cache-hit rate
     for fp in files:
         try:
-            total, quietable, nq = analyze(fp)
+            total, quietable, nq, fresh, cread, ccreate = analyze(fp)
         except Exception:
             continue
         if total < MIN_SESSION_BYTES:
@@ -81,6 +90,10 @@ def main():
         fracs.append(100.0 * saved / total)
         pooled_total += total
         pooled_quiet += saved
+        p_fresh += fresh; p_cread += cread; p_ccreate += ccreate
+        sess_in = fresh + cread + ccreate
+        if sess_in > 0:
+            hit_fracs.append(100.0 * cread / sess_in)
 
     if not fracs:
         print("no sessions matched"); return
@@ -95,6 +108,20 @@ def main():
     print(f"  sessions with >0 cut:  {sum(1 for f in fracs if f>0)}/{big}")
     print("\nOne-time floor (not counting per-turn re-send, which raises it). The")
     print("~99% per-op cut is measured separately by bench/run.sh.")
+
+    # ── Cache-hit observability (the post's #1 lever — Coinbase quoted 5%->60%) ──
+    pooled_in = p_fresh + p_cread + p_ccreate
+    if pooled_in > 0:
+        def m(n): return f"{n/1e6:.1f}M" if n >= 1e6 else f"{n/1e3:.0f}K"
+        print(f"\n# cache-hit rate — measured across the same {big} sessions")
+        print(f"  pooled cache-hit:      {100.0*p_cread/pooled_in:5.1f}%  (cache_read / all input tokens; higher = warmer prefix, cheaper turns)")
+        if hit_fracs:
+            hit_fracs.sort()
+            print(f"  median session:        {statistics.median(hit_fracs):5.1f}%")
+        print(f"  fresh / cache-read / cache-creation: {m(p_fresh)} / {m(p_cread)} / {m(p_ccreate)} tokens")
+        print("\nCache reads are billed ~0.1x input, so a high hit rate is most of the saving.")
+        print("quiet-bash helps by NOT re-sending bulky output that would shift the cached")
+        print("prefix; this is the real-transcript counterpart to the post's 5%->60% number.")
 
 if __name__ == "__main__":
     main()
