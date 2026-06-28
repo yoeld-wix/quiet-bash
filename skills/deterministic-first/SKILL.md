@@ -24,6 +24,7 @@ the pipeline and let only the answer enter context.
 | **Parse** structured slices | scan a config visually | `jq` / `yq` / `quiet-query FILE keys` |
 | **Config value** — one field from a config/lockfile | read the whole file to find it | `quiet-conf FILE KEY` (jq path for json/yaml, var name for .env) |
 | **Code archaeology** — who/when/which-commit | scroll full `git log`/`blame`, read files | `quiet-hist PATH` · `quiet-hist --pick STR` · `quiet-blame FILE S E` |
+| **Orient** in an unfamiliar repo / env | `ls`/`find`/read files; probe `node -v`/`which X` | `quiet-map` (sizes/churn/tree) · `quiet-env` (pkg-mgr, CLIs, versions) |
 | **Math / dates / ordering** — compute in-head | sum/percent/date-diff/order by reasoning | `awk`/`bc` · `date -d` · `tsort` (topological order) |
 | **Verify** a fact / triage a log | read output to confirm or count failures | `quiet-verify FILE 'PAT'` · `quiet-check FILE` (PASS/FAIL + error tally) · `test -f` |
 | **Repeat** over a set | N near-identical tool calls | `xargs` · `for f in …; do …; done` |

@@ -671,5 +671,50 @@ for tok in 'quiet-conf' 'quiet-hist' 'tsort'; do
 done
 grep -q 'Repeated & blocking work' "$ROOT/README.md" 2>/dev/null && pass "README round-1 row intact" || bad "README row"
 
+echo "== quiet-env =="
+QE="$ROOT/core/quiet-env.sh"
+out=$("$QE"); st=$?
+{ [ "$st" -eq 0 ] && printf '%s' "$out" | grep -q '\[quiet-env\] platform'; } && pass "quiet-env runs + platform" || bad "quiet-env platform"
+printf '%s' "$out" | grep -q 'git' && pass "quiet-env lists git CLI" || bad "quiet-env git"
+ED=$(mktemp -d); ( cd "$ED" && : > pnpm-lock.yaml && "$QE" ) | grep -q 'pnpm' && pass "quiet-env detects pnpm" || bad "quiet-env pnpm"
+rm -rf "$ED"
+
+echo "== quiet-map =="
+QM="$ROOT/core/quiet-map.sh"
+out=$("$QM"); st=$?
+{ [ "$st" -eq 0 ] && printf '%s' "$out" | grep -q '\[quiet-map\] largest'; } && pass "quiet-map size map runs" || bad "quiet-map size"
+QUIET_MAP_BIG_LINES=10 "$QM" | grep -q '⚠' && pass "quiet-map flags big files" || bad "quiet-map flag"
+"$QM" --churn >/dev/null 2>&1; [ $? -eq 0 ] && pass "quiet-map --churn runs in repo" || bad "quiet-map churn"
+"$QM" --tree | grep -q 'core' && pass "quiet-map --tree lists dirs" || bad "quiet-map tree"
+"$QM" --bogus >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-map unknown flag exit 2" || bad "quiet-map unknown flag"
+
+echo "== bench: enrichment grading =="
+. "$ROOT/bench/enrichment-tasks.sh"
+[ "$(fm_grade 0 'You would edit core/quiet-core.sh for that')" = pass ] && pass "fm_grade correct→pass" || bad "fm_grade correct"
+[ "$(fm_grade 0 'totally unrelated')" = fail ] && pass "fm_grade wrong→fail" || bad "fm_grade wrong"
+[ "$(fm_grade 99 'anything')" = fail ] && pass "fm_grade out-of-range→fail" || bad "fm_grade oor"
+{ [ "${#FM_TASK_PROMPTS[@]}" -eq "${#FM_TASK_ASSERTS[@]}" ] && [ "${#FM_TASK_PROMPTS[@]}" -gt 0 ]; } && pass "fm tasks aligned" || bad "fm aligned"
+
+echo "== bench: enrichment report =="
+ft=$(mktemp)
+cat > "$ft" <<'JSONL'
+{"arm":"control","task":0,"rep":1,"input":2000,"output":80,"cost":0.05,"ms":9000,"turns":6,"pass":true}
+{"arm":"control","task":1,"rep":1,"input":2200,"output":90,"cost":0.06,"ms":9500,"turns":6,"pass":true}
+{"arm":"map","task":0,"rep":1,"input":1200,"output":70,"cost":0.03,"ms":6000,"turns":4,"pass":true}
+{"arm":"map","task":1,"rep":1,"input":1300,"output":75,"cost":0.035,"ms":6200,"turns":4,"pass":true}
+JSONL
+frep=$(python3 "$ROOT/bench/enrichment-report.py" "$ft")
+printf '%s' "$frep" | grep -q 'ZERO-REGRESSION ✓' && pass "report: equal pass-rate → zero-regression" || bad "report zero-regression"
+printf '%s' "$frep" | grep -Eq 'cost -[0-9]' && pass "report: cheaper arm shows negative cost delta" || bad "report cost delta"
+printf '%s' "$frep" | grep -q ' 6.0 ' && pass "report: turns column populated (not 0.0)" || bad "report turns column"
+rm -f "$ft"
+
+echo "== enrichment skill rows =="
+SKE="$ROOT/skills/deterministic-first/SKILL.md"
+for tok in 'quiet-env' 'quiet-map'; do
+  grep -qF "$tok" "$SKE" 2>/dev/null && pass "skill mentions $tok" || bad "skill missing $tok"
+done
+grep -q 'Orient' "$SKE" 2>/dev/null && pass "skill has orient row" || bad "skill orient row"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
