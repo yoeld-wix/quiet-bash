@@ -516,6 +516,25 @@ echo "== quiet-dedup =="
   rm -rf "$QUIET_LOG_DIR"
 )
 
+echo "== adapter: duplicate-read dedup =="
+(
+  export QUIET_LOG_DIR; QUIET_LOG_DIR=$(mktemp -d)
+  BIG="$QUIET_LOG_DIR/big.log"
+  awk 'BEGIN{for(i=0;i<4000;i++)print "line "i" some filler text to exceed the outline threshold"}' > "$BIG"
+  CONTENT=$(cat "$BIG")
+  EV=$(jq -n --arg p "$BIG" --arg t "$CONTENT" --arg s "sessDED" \
+        '{session_id:$s, tool_name:"Read", tool_input:{file_path:$p}, tool_response:$t}')
+  # first event: pass through (adapter prints nothing)
+  o1=$(printf '%s' "$EV" | "$ROOT/adapters/claude-code-result.sh")
+  [ -z "$o1" ] && pass "adapter first read passes through" || bad "adapter first read"
+  # second identical event: deduped (adapter prints replacement with the stub)
+  o2=$(printf '%s' "$EV" | "$ROOT/adapters/claude-code-result.sh")
+  printf '%s' "$o2" | jq -e '.hookSpecificOutput.updatedToolOutput' >/dev/null 2>&1 \
+    && printf '%s' "$o2" | grep -q 'unchanged since you read it' \
+    && pass "adapter repeat read deduped" || bad "adapter repeat read"
+  rm -rf "$QUIET_LOG_DIR"
+)
+
 echo "== deterministic-first skill =="
 SK="$ROOT/skills/deterministic-first/SKILL.md"
 [ -f "$SK" ] && pass "skill file exists" || bad "skill file exists"
