@@ -839,5 +839,19 @@ for tok in 'quiet-env' 'quiet-map'; do
 done
 grep -q 'Orient' "$SKE" 2>/dev/null && pass "skill has orient row" || bad "skill orient row"
 
+echo "== quiet-applies =="
+QA2="$ROOT/core/quiet-applies.sh"
+AR=$(mktemp -d); AP=$(mktemp)
+( cd "$AR" && git init -q && git config user.email t@t && git config user.name t \
+  && printf 'a\nb\nc\n' > f.txt && git add f.txt && git commit -qm init \
+  && printf 'a\nB\nc\n' > f.txt && git diff > "$AP" && git checkout -q f.txt )
+( cd "$AR" && "$QA2" -f "$AP" ) | grep -q 'APPLIES' && pass "quiet-applies clean → APPLIES" || bad "quiet-applies clean"
+( cd "$AR" && "$QA2" -f "$AP" >/dev/null 2>&1; [ $? -eq 0 ] ) && pass "quiet-applies clean exit 0" || bad "quiet-applies exit0"
+# corrupt the target so the patch no longer applies → CONFLICT exit 1
+( cd "$AR" && printf 'totally\ndifferent\n' > f.txt && "$QA2" -f "$AP" >/dev/null 2>&1; [ $? -eq 1 ] ) && pass "quiet-applies conflict → exit 1" || bad "quiet-applies conflict"
+( cd "$AR" && "$QA2" </dev/null >/dev/null 2>&1; [ $? -eq 2 ] ) && pass "quiet-applies empty → exit 2" || bad "quiet-applies empty"
+NG=$(mktemp -d); ( cd "$NG" && printf 'x' | "$QA2" >/dev/null 2>&1; [ $? -eq 2 ] ) && pass "quiet-applies non-git → exit 2" || bad "quiet-applies non-git"
+rm -rf "$AR" "$NG" "$AP"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
