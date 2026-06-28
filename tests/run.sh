@@ -679,5 +679,14 @@ printf '%s' "$out" | grep -q 'git' && pass "quiet-env lists git CLI" || bad "qui
 ED=$(mktemp -d); ( cd "$ED" && : > pnpm-lock.yaml && "$QE" ) | grep -q 'pnpm' && pass "quiet-env detects pnpm" || bad "quiet-env pnpm"
 rm -rf "$ED"
 
+echo "== quiet-map =="
+QM="$ROOT/core/quiet-map.sh"
+out=$("$QM"); st=$?
+{ [ "$st" -eq 0 ] && printf '%s' "$out" | grep -q '\[quiet-map\] largest'; } && pass "quiet-map size map runs" || bad "quiet-map size"
+QUIET_MAP_BIG_LINES=10 "$QM" | grep -q '⚠' && pass "quiet-map flags big files" || bad "quiet-map flag"
+"$QM" --churn >/dev/null 2>&1; [ $? -eq 0 ] && pass "quiet-map --churn runs in repo" || bad "quiet-map churn"
+"$QM" --tree | grep -q 'core' && pass "quiet-map --tree lists dirs" || bad "quiet-map tree"
+"$QM" --bogus >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-map unknown flag exit 2" || bad "quiet-map unknown flag"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
