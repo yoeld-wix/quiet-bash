@@ -19,13 +19,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/core/quiet-core.sh"
 command -v jq >/dev/null 2>&1 || exit 0
 
-# Result quieting (Read/MCP/Web tool results) is OPT-IN. The n=20 agentic
-# benchmark (bench/RESULTS.md) found this PostToolUse lever adds cost without a
-# net benefit on typical workloads, while the command-output (PreToolUse Bash)
-# lever pays off — so the shipped default is "command-output only". Turn this
-# path on for large-MCP / large-Web-result workloads with:
-#     export QUIET_RESULT_HOOK=1
-[ -n "${QUIET_RESULT_HOOK:-}" ] || exit 0
+# Split default: the LOSSLESS, near-free parts of this hook stay on (duplicate-read
+# dedup, and opt-in diff-on-reread); the EXPENSIVE / lossy quieting — source-file
+# outlining and MCP/Web result collapsing — is OPT-IN. The n=20 agentic benchmark
+# (bench/RESULTS.md) found that expensive lever adds cost without a net benefit on
+# typical coding workloads, while the command-output (PreToolUse Bash) lever pays
+# off. Enable the expensive paths for large-MCP / large-Web / big-source-read
+# workloads with:  export QUIET_RESULT_HOOK=1
 
 quiet_prune
 
@@ -62,9 +62,9 @@ summary=""
 obytes=$(printf '%s' "$text" | wc -c | tr -d ' ')
 
 if [ "$tool" = "Read" ]; then
-  # Native Read: outline a large SOURCE file; pass anything else through untouched
-  # (don't head/tail arbitrary large reads — the agent asked for that content).
-  if [ "$obytes" -gt "${QUIET_OUTLINE_MIN_BYTES}" ]; then
+  # Native Read: outline a large SOURCE file (OPT-IN — lossy-ish: replaces the
+  # full read with a signature skeleton). Dedup/diff below stay on regardless.
+  if [ -n "${QUIET_RESULT_HOOK:-}" ] && [ "$obytes" -gt "${QUIET_OUTLINE_MIN_BYTES}" ]; then
     if [ -n "$path" ] && [ -f "$path" ]; then
       case "${path##*.}" in
         py|js|mjs|cjs|jsx|ts|tsx|go|rs|java|kt|kts|scala|rb|c|h|cc|cpp|cxx|hpp|php|swift)
@@ -87,7 +87,9 @@ if [ "$tool" = "Read" ]; then
     fi
   fi
 else
-  # MCP / WebFetch / WebSearch: collapse large JSON, head/tail large text (as before).
+  # MCP / WebFetch / WebSearch: collapse large JSON, head/tail large text. OPT-IN
+  # (lossy preview) — pass through untouched unless explicitly enabled.
+  [ -n "${QUIET_RESULT_HOOK:-}" ] || exit 0
   summary=$(quiet_result_summarize "$text" "$tool") || exit 0
 fi
 

@@ -352,10 +352,23 @@ quiet_rewrite "cat $OT/big.py | grep def" >/dev/null && bad "piped read should p
 # small source file is left alone
 echo "def tiny(): pass" > "$OT/tiny.py"
 quiet_rewrite "cat $OT/tiny.py" >/dev/null && bad "small file should pass through" || pass "small source read passes through"
-# Native Read path: tool_input.path to a large source file → outline in updatedToolOutput
-# (opt-in path — result quieting is off by default; see the PostToolUse section above)
-export QUIET_RESULT_HOOK=1
+# Result-hook split: the LOSSY/expensive paths (source outlining, MCP collapse)
+# are opt-in; the LOSSLESS dedup stays ON by default. Prove both with the var unset.
 CR="$ROOT/adapters/claude-code-result.sh"
+bigpy_payload=$(jq -n --arg p "$OT/big.py" --arg c "$(cat "$OT/big.py")" --arg s "sessSPLIT" \
+  '{session_id:$s, tool_name:"Read", tool_input:{path:$p}, tool_response:$c}')
+# (1) source outlining is OFF by default → first read passes through (no outline)
+off1=$(printf '%s' "$bigpy_payload" | env -u QUIET_RESULT_HOOK QUIET_OUTLINE_MIN_BYTES=30000 "$CR")
+printf '%s' "$off1" | jq -r '.hookSpecificOutput.updatedToolOutput' 2>/dev/null | grep -q 'outline' \
+  && bad "source outlining must be off by default" || pass "source outlining off by default"
+# (2) Read-dedup is ON by default → the second identical unchanged read is stubbed sans var
+off2=$(printf '%s' "$bigpy_payload" | env -u QUIET_RESULT_HOOK QUIET_OUTLINE_MIN_BYTES=30000 "$CR")
+printf '%s' "$off2" | grep -q 'unchanged since you read it' \
+  && pass "Read-dedup stays ON by default (split)" || bad "Read-dedup should be on by default"
+
+# Native Read path: tool_input.path to a large source file → outline in updatedToolOutput
+# (opt-in path — outlining is off by default; see the PostToolUse section above)
+export QUIET_RESULT_HOOK=1
 content=$(cat "$OT/big.py")
 payload=$(jq -n --arg p "$OT/big.py" --arg c "$content" '{tool_name:"Read", tool_input:{path:$p}, tool_response:$c}')
 ro=$(printf '%s' "$payload" | QUIET_OUTLINE_MIN_BYTES=30000 "$CR")
