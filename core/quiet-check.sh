@@ -18,6 +18,7 @@ file="${1:-}"
 : "${QUIET_CHECK_ERROR_RE:=error|ERROR|FAIL(ED|URE)?|Exception|✗}"
 : "${QUIET_CHECK_WARN_RE:=warn(ing)?|WARN}"
 : "${QUIET_CHECK_FIRST_K:=5}"
+case "$QUIET_CHECK_FIRST_K" in ''|*[!0-9]*) echo "quiet-check: QUIET_CHECK_FIRST_K must be a positive integer" >&2; exit 2 ;; esac
 
 e=$(grep -Ec -- "$QUIET_CHECK_ERROR_RE" "$file" 2>/dev/null); rc=$?
 [ "$rc" -ge 2 ] && { echo "quiet-check: invalid QUIET_CHECK_ERROR_RE" >&2; exit 2; }

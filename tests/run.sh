@@ -464,6 +464,7 @@ out=$("$QC" "$GF"); st=$?
 "$QC" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-check usage exit 2" || bad "quiet-check usage"
 "$QC" /no/such/file >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-check missing-file exit 2" || bad "quiet-check missing-file"
 QUIET_CHECK_ERROR_RE='[' "$QC" "$CF" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-check invalid regex exit 2" || bad "quiet-check invalid regex"
+QUIET_CHECK_FIRST_K=abc "$QC" "$CF" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-check non-numeric QUIET_CHECK_FIRST_K exit 2" || bad "quiet-check non-numeric QUIET_CHECK_FIRST_K"
 rm -f "$CF" "$GF"
 
 echo "== quiet-wait =="

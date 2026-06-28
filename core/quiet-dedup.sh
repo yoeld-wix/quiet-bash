@@ -9,9 +9,9 @@
 # Lossless (content is above), session-scoped, and only ever applied to the
 # just-emitted result (tail edit → prompt-cache safe).
 
-# Portable mtime in epoch seconds (BSD stat, then GNU stat, else 0).
+# Sub-second mtime where available (BSD %Fm = fractional epoch, else GNU whole-second, else 0).
 _quiet_mtime() {
-  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0
+  stat -f %Fm "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0
 }
 
 # quiet_dedup_check <session_id> <path> <offset> <limit>
