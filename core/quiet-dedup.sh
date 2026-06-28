@@ -9,9 +9,14 @@
 # Lossless (content is above), session-scoped, and only ever applied to the
 # just-emitted result (tail edit → prompt-cache safe).
 
-# Sub-second mtime where available (BSD %Fm = fractional epoch, else GNU whole-second, else 0).
+# Whole-second mtime, cross-platform. GNU FIRST (stat -c %Y): on GNU, BSD's
+# `stat -f` is --file-system and leaks filesystem output to stdout even when the
+# format is invalid, which would corrupt the captured value; trying the GNU flag
+# first avoids ever invoking `stat -f` on GNU. `head -1` is belt-and-suspenders
+# against any platform that prints extra lines. Dedup only needs a stable value,
+# not sub-second precision.
 _quiet_mtime() {
-  stat -f %Fm "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0
+  { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; } | head -1
 }
 
 # quiet_dedup_check <session_id> <path> <offset> <limit>
