@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versioning is [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Cache-hit observability** in `bench/session-savings.py` — it now also reports the real
+  **cache-hit rate** (`cache_read` / all input tokens) measured across your own Claude Code
+  transcripts, with the fresh / cache-read / cache-creation token split. This is the
+  real-transcript counterpart to the Coinbase post's headline caching number. (Measured on
+  the author's 188 sessions: ~96.8% pooled — Claude Code's own prompt caching is already very
+  warm, so quiet-bash's payoff is avoiding the *fresh* re-bills and not busting that prefix.)
+
 ## [1.23.0] — 2026-06-28
 
 ### Changed

@@ -817,6 +817,21 @@ printf '%s' "$frep" | grep -Eq 'cost -[0-9]' && pass "report: cheaper arm shows 
 printf '%s' "$frep" | grep -q ' 6.0 ' && pass "report: turns column populated (not 0.0)" || bad "report turns column"
 rm -f "$ft"
 
+echo "== bench: cache-hit observability (session-savings) =="
+ST=$(mktemp -d)
+python3 - "$ST/s.jsonl" <<'PY'
+import json,sys
+# one big tool_result to clear MIN_SESSION_BYTES, plus usage with a known cache split:
+# cache_read 900 / (input 100 + cache_read 900 + cache_creation 0) = 90.0%
+rows=[{"message":{"content":[{"type":"tool_result","content":"x"*30000}],
+       "usage":{"input_tokens":100,"cache_read_input_tokens":900,"cache_creation_input_tokens":0}}}]
+open(sys.argv[1],"w").write("\n".join(json.dumps(r) for r in rows)+"\n")
+PY
+chs=$(python3 "$ROOT/bench/session-savings.py" "$ST/s.jsonl" 2>/dev/null)
+printf '%s' "$chs" | grep -q 'cache-hit rate' && pass "session-savings reports cache-hit section" || bad "cache-hit section missing"
+printf '%s' "$chs" | grep -q 'pooled cache-hit:.*90.0%' && pass "cache-hit rate computed correctly (90.0%)" || bad "cache-hit rate wrong"
+rm -rf "$ST"
+
 echo "== enrichment skill rows =="
 SKE="$ROOT/skills/deterministic-first/SKILL.md"
 for tok in 'quiet-env' 'quiet-map'; do
