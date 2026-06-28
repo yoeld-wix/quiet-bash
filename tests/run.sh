@@ -879,5 +879,11 @@ BADJ=$(mktemp); printf 'not json\n{"message":{"content":[]}}\n' > "$BADJ"
 python3 "$DA" "$BADJ" >/dev/null 2>&1 && pass "audit tolerates malformed lines" || bad "audit malformed"
 rm -f "$BADJ"
 
+echo "== frontier skill rows =="
+SKF="$ROOT/skills/deterministic-first/SKILL.md"
+for tok in 'quiet-patch' 'quiet-applies'; do
+  grep -qF "$tok" "$SKF" 2>/dev/null && pass "skill mentions $tok" || bad "skill missing $tok"
+done
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

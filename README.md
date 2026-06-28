@@ -45,6 +45,7 @@ It quiets the **four things that bloat an agent's context**:
 | **Repeated & blocking work** — re-reading unchanged files, judging logs, polling | model re-reads / re-judges / re-polls every turn | dedup of unchanged re-reads · `quiet-check` verdict+tally · `quiet-wait` one-shot poll |
 | **Lookups & archaeology** — config values, git history, recursive search | model reads whole files / scrolls full logs / floods on `grep -r` | `quiet-conf` · `quiet-hist`/`quiet-blame` · recursive `grep`/`rg` auto-collapsed |
 | **Orientation** — repo shape & toolchain | model explores with `ls`/`find`/reads, probes `node -v`/`which` | `quiet-map` (file-size/churn/tree map) · `quiet-env` (one-shot env digest) |
+| **Diff apply & audit** — apply a patch, find more savings | re-emit whole files; brainstorm what to optimize | `quiet-applies`/`quiet-patch` (atomic git apply) · `bench/dfirst-audit.py` (mine transcripts for candidates) |
 
 ## Highlights
 
