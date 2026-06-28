@@ -688,5 +688,25 @@ QUIET_MAP_BIG_LINES=10 "$QM" | grep -q '⚠' && pass "quiet-map flags big files"
 "$QM" --tree | grep -q 'core' && pass "quiet-map --tree lists dirs" || bad "quiet-map tree"
 "$QM" --bogus >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-map unknown flag exit 2" || bad "quiet-map unknown flag"
 
+echo "== bench: enrichment grading =="
+. "$ROOT/bench/enrichment-tasks.sh"
+[ "$(fm_grade 0 'You would edit core/quiet-core.sh for that')" = pass ] && pass "fm_grade correct→pass" || bad "fm_grade correct"
+[ "$(fm_grade 0 'totally unrelated')" = fail ] && pass "fm_grade wrong→fail" || bad "fm_grade wrong"
+[ "$(fm_grade 99 'anything')" = fail ] && pass "fm_grade out-of-range→fail" || bad "fm_grade oor"
+{ [ "${#FM_TASK_PROMPTS[@]}" -eq "${#FM_TASK_ASSERTS[@]}" ] && [ "${#FM_TASK_PROMPTS[@]}" -gt 0 ]; } && pass "fm tasks aligned" || bad "fm aligned"
+
+echo "== bench: enrichment report =="
+ft=$(mktemp)
+cat > "$ft" <<'JSONL'
+{"arm":"control","task":0,"rep":1,"input":2000,"output":80,"cost":0.05,"ms":9000,"turns":6,"pass":true}
+{"arm":"control","task":1,"rep":1,"input":2200,"output":90,"cost":0.06,"ms":9500,"turns":6,"pass":true}
+{"arm":"map","task":0,"rep":1,"input":1200,"output":70,"cost":0.03,"ms":6000,"turns":4,"pass":true}
+{"arm":"map","task":1,"rep":1,"input":1300,"output":75,"cost":0.035,"ms":6200,"turns":4,"pass":true}
+JSONL
+frep=$(python3 "$ROOT/bench/enrichment-report.py" "$ft")
+printf '%s' "$frep" | grep -q 'ZERO-REGRESSION ✓' && pass "report: equal pass-rate → zero-regression" || bad "report zero-regression"
+printf '%s' "$frep" | grep -Eq 'cost -[0-9]' && pass "report: cheaper arm shows negative cost delta" || bad "report cost delta"
+rm -f "$ft"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
