@@ -671,5 +671,13 @@ for tok in 'quiet-conf' 'quiet-hist' 'tsort'; do
 done
 grep -q 'Repeated & blocking work' "$ROOT/README.md" 2>/dev/null && pass "README round-1 row intact" || bad "README row"
 
+echo "== quiet-env =="
+QE="$ROOT/core/quiet-env.sh"
+out=$("$QE"); st=$?
+{ [ "$st" -eq 0 ] && printf '%s' "$out" | grep -q '\[quiet-env\] platform'; } && pass "quiet-env runs + platform" || bad "quiet-env platform"
+printf '%s' "$out" | grep -q 'git' && pass "quiet-env lists git CLI" || bad "quiet-env git"
+ED=$(mktemp -d); ( cd "$ED" && : > pnpm-lock.yaml && "$QE" ) | grep -q 'pnpm' && pass "quiet-env detects pnpm" || bad "quiet-env pnpm"
+rm -rf "$ED"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
