@@ -602,5 +602,18 @@ out=$("$ROOT/core/quiet-check.sh" "$LOG"); st=$?
 { [ "$st" -eq 1 ] && printf '%s' "$out" | grep -q 'FAIL' && printf '%s' "$out" | grep -qE '1 error'; } \
   && pass "quiet-check recovers verdict+tally from spill" || bad "quiet-check over spill"
 
+echo "== quiet-conf =="
+QCF="$ROOT/core/quiet-conf.sh"
+JF=$(mktemp).json; printf '{"name":"x","scripts":{"test":"jest"},"dependencies":{"react":"18.2.0"}}' > "$JF"
+[ "$("$QCF" "$JF" '.scripts.test')" = "jest" ] && pass "quiet-conf json jq-path" || bad "quiet-conf json jq-path"
+[ "$("$QCF" "$JF" 'dependencies.react')" = "18.2.0" ] && pass "quiet-conf json bare-key (dot prepended)" || bad "quiet-conf json bare-key"
+"$QCF" "$JF" '.nope' >/dev/null 2>&1; [ $? -eq 1 ] && pass "quiet-conf missing key exit 1" || bad "quiet-conf missing key"
+EF=$(mktemp); printf 'FOO=bar\nexport TOKEN="abc123"\n' > "$EF"
+[ "$("$QCF" "$EF" 'FOO')" = "bar" ] && pass "quiet-conf env plain" || bad "quiet-conf env plain"
+[ "$("$QCF" "$EF" 'TOKEN')" = "abc123" ] && pass "quiet-conf env export+quotes" || bad "quiet-conf env quotes"
+"$QCF" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-conf usage exit 2" || bad "quiet-conf usage"
+"$QCF" /no/such x >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-conf missing-file exit 2" || bad "quiet-conf missing-file"
+rm -f "$JF" "$EF"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
