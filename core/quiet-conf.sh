@@ -35,6 +35,7 @@ case "$file" in
     line=$(grep -E "^[[:space:]]*(export[[:space:]]+)?${esc}=" "$file" 2>/dev/null | head -1)
     [ -n "$line" ] || { echo "quiet-conf: key not found: $key" >&2; exit 1; }
     val=${line#*=}
+    val=${val%$'\r'}   # tolerate CRLF-authored .env files
     case "$val" in
       \"*\") val=${val#\"}; val=${val%\"} ;;
       \'*\') val=${val#\'}; val=${val%\'} ;;
