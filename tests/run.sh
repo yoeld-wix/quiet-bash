@@ -155,6 +155,14 @@ rep=$(printf '%s' "$oj" | jq -r '.hookSpecificOutput.updatedToolOutput.content[0
 [ -n "$rep" ] && echo "$rep" | grep -q 'quiet-bash' && pass "large JSON MCP result replaced" || bad "mcp json replace"
 [ "${#rep}" -lt "${#bigjson}" ] && pass "mcp summary smaller than raw (${#rep} < ${#bigjson})" || bad "mcp json not smaller"
 echo "$rep" | grep -q 'more of 3000' && pass "mcp json collapses repeated shape" || bad "mcp json collapse"
+# anti-thrash guarantee: a collapsed JSON result must stay LOSSLESS and queryable
+# so the agent drills into the spill instead of re-fetching. (The 3-arm benchmark's
+# apparent "full-arm regression" was turn-count variance, NOT this path — keep it
+# that way structurally: lossy/non-queryable results are what would cause re-fetch.)
+spillref=$(printf '%s' "$rep" | grep -oE '/[^ "]+result-[A-Za-z0-9]+\.json' | head -1)
+{ [ -n "$spillref" ] && [ -f "$spillref" ] && cmp -s "$MT/bigjson" "$spillref"; } \
+  && pass "mcp json spill is byte-exact (lossless — no re-fetch needed)" || bad "mcp json spill not byte-exact"
+echo "$rep" | grep -q 'quiet-query.sh' && pass "mcp json summary points to quiet-query (drill-in, not re-fetch)" || bad "mcp json missing query pointer"
 # large TEXT result → spilled with head/tail
 bigtext=$(for i in $(seq 1 4000); do echo "log line $i: something happened here with detail"; done)
 printf '%s' "$bigtext" > "$MT/bigtext"
