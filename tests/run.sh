@@ -853,5 +853,20 @@ AR=$(mktemp -d); AP=$(mktemp)
 NG=$(mktemp -d); ( cd "$NG" && printf 'x' | "$QA2" >/dev/null 2>&1; [ $? -eq 2 ] ) && pass "quiet-applies non-git → exit 2" || bad "quiet-applies non-git"
 rm -rf "$AR" "$NG" "$AP"
 
+echo "== quiet-patch =="
+QP="$ROOT/core/quiet-patch.sh"
+PR=$(mktemp -d); PP=$(mktemp)
+( cd "$PR" && git init -q && git config user.email t@t && git config user.name t \
+  && printf 'a\nb\nc\n' > f.txt && git add f.txt && git commit -qm init \
+  && printf 'a\nB\nc\n' > f.txt && git diff > "$PP" && git checkout -q f.txt )
+( cd "$PR" && "$QP" -f "$PP" >/dev/null && grep -q '^B$' f.txt ) && pass "quiet-patch applies + changes file" || bad "quiet-patch applies"
+# re-apply same patch (already applied) → FAIL exit 1, tree untouched
+before=$(cd "$PR" && cat f.txt)
+( cd "$PR" && "$QP" -f "$PP" >/dev/null 2>&1; [ $? -eq 1 ] ) && pass "quiet-patch re-apply → FAIL exit 1" || bad "quiet-patch reapply"
+after=$(cd "$PR" && cat f.txt); [ "$before" = "$after" ] && pass "quiet-patch FAIL leaves tree untouched" || bad "quiet-patch tree untouched"
+( cd "$PR" && "$QP" </dev/null >/dev/null 2>&1; [ $? -eq 2 ] ) && pass "quiet-patch empty → exit 2" || bad "quiet-patch empty"
+NGP=$(mktemp -d); ( cd "$NGP" && printf 'x' | "$QP" >/dev/null 2>&1; [ $? -eq 2 ] ) && pass "quiet-patch non-git → exit 2" || bad "quiet-patch non-git"
+rm -rf "$PR" "$NGP" "$PP"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
