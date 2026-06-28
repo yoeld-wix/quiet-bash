@@ -38,6 +38,20 @@ done
 quiet_rewrite 'files=$(find src -name x)' >/dev/null && bad "cmd-subst find should pass through" || pass "cmd-subst find passes through"
 quiet_rewrite 'd=$(gh pr diff 1)' >/dev/null && bad "cmd-subst gh should pass through" || pass "cmd-subst gh passes through"
 
+echo "== core: infra/listing/logdump coverage =="
+for c in "terraform plan" "terraform apply -auto-approve" "helm upgrade x ./chart" "pulumi up" \
+         "ansible-playbook site.yml" "kubectl get pods -A" "kubectl describe pod x" "kubectl logs mypod" \
+         "docker images" "docker ps -a" "docker logs web" "npm ls" "pnpm list" "pip list" "pip freeze" \
+         "pip show requests" "brew list" "journalctl -u nginx"; do
+  if quiet_rewrite "$c" >/dev/null; then pass "wrap: $c"; else bad "should wrap: $c"; fi
+done
+# must pass through: non-verbose subcommands, explicit limits, and assignment-corrupting forms
+for c in "terraform version" "helm version" "kubectl version" "kubectl get pods | head" \
+         "docker logs web > out.txt" "pip show requests | grep Version" "npm ls --help"; do
+  if quiet_rewrite "$c" >/dev/null; then bad "should pass: $c"; else pass "pass: $c"; fi
+done
+quiet_rewrite 'pods=$(kubectl get pods)' >/dev/null && bad "cmd-subst kubectl should pass through" || pass "cmd-subst kubectl passes through"
+
 echo "== core: curl layer =="
 for c in "curl https://api.example.com/data" "curl -s https://x/api" "curl -X POST https://x -d @body" \
          "/usr/bin/curl https://x"; do

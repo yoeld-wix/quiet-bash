@@ -352,6 +352,19 @@ quiet_rewrite() {
     return 0
   fi
 
+  # ── infra/list content path: large output the agent wants a SAMPLE of ──
+  # Listings (read top-down) → head + count; log dumps (recent matters) → head+tail.
+  # Both spill the full output (lossless) and only kick in past the inline limit, so
+  # small results still pass inline. Skip piped/redirected/$()/backticks (would
+  # corrupt an assignment or fight an explicit limit the agent already set).
+  local listing_re='(^|[[:space:];&|(])(kubectl[[:space:]]+(get|describe)|docker[[:space:]]+(images|ps)|(npm|pnpm|yarn)[[:space:]]+(ls|list)|pip[0-9.]*[[:space:]]+(list|freeze|show)|brew[[:space:]]+(list|info))'
+  local logdump_re='(^|[[:space:];&|(])(kubectl[[:space:]]+logs|docker[[:space:]]+logs|journalctl|dmesg)([[:space:]]|$)'
+  local help_re='(^|[[:space:]])(-h|--help|--version|version)([[:space:]]|$)'
+  if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* ]] && ! [[ $cmd =~ $help_re ]]; then
+    if [[ $cmd =~ $listing_re ]]; then _quiet_wrap_search  "$cmd"; return 0; fi
+    if [[ $cmd =~ $logdump_re ]]; then _quiet_wrap_content "$cmd"; return 0; fi
+  fi
+
   # ── verbose-runner path: build/test/install/CI tooling across ecosystems ──
   # Boundary before a tool token: start, whitespace, shell operator, or a path
   # separator (so `./gradlew`, `./mvnw`, `/usr/bin/make` are recognised).
@@ -365,6 +378,7 @@ quiet_rewrite() {
   managed="${managed}|go[[:space:]]+(test|build|install|vet|mod|get|run)"
   managed="${managed}|make([[:space:]]|$)|cmake([[:space:]]|$)"
   managed="${managed}|docker[[:space:]]+(build|compose)|docker-compose[[:space:]]+(build|up)"
+  managed="${managed}|terraform[[:space:]]+(plan|apply|destroy|init)|tofu[[:space:]]+(plan|apply|destroy|init)|pulumi[[:space:]]+(up|preview|destroy)|helm[[:space:]]+(install|upgrade|template|lint)|ansible-playbook([[:space:]]|$)"
   managed="${managed}|bundle[[:space:]]+(install|exec|update)|gem[[:space:]]+install"
   managed="${managed}|bk([[:space:]]|$)|buildkite"
   local verbose_re="${pre}(${always}|${managed})"
