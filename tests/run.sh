@@ -605,6 +605,33 @@ echo "== cache-safety: rendered output is deterministic (never busts the prompt-
   rm -rf "$QUIET_LOG_DIR"
 )
 
+echo "== command-level dedup (repeat cat of an unchanged file) =="
+(
+  export QUIET_LOG_DIR; QUIET_LOG_DIR=$(mktemp -d)
+  . "$ROOT/core/quiet-core.sh"
+  CF="$QUIET_LOG_DIR/data.txt"; printf 'hello\nworld\n' > "$CF"
+  # first read: pass through (returns 1, records it)
+  quiet_cmd_dedup "sessCMD" "cat $CF" >/dev/null && bad "first cat should pass through" || pass "first cat passes through"
+  # second identical read of unchanged file: deduped → echoes a stub
+  out=$(quiet_cmd_dedup "sessCMD" "cat $CF") \
+    && printf '%s' "$out" | grep -q 'unchanged since you read it' \
+    && pass "repeat cat of unchanged file deduped" || bad "repeat cat dedup"
+  # after the file changes, it must read fresh again
+  printf 'changed\n' >> "$CF"
+  quiet_cmd_dedup "sessCMD" "cat $CF" >/dev/null && bad "changed file should re-read" || pass "changed file re-reads (no stale stub)"
+  # unsafe forms pass through: pipe, redirect, multiple files, glob, no session
+  printf 'a\n' > "$QUIET_LOG_DIR/a"; printf 'b\n' > "$QUIET_LOG_DIR/b"
+  quiet_cmd_dedup "sessCMD" "cat $CF | head" >/dev/null && bad "piped cat dedup" || pass "piped cat passes through"
+  quiet_cmd_dedup "sessCMD" "cat $QUIET_LOG_DIR/a $QUIET_LOG_DIR/b" >/dev/null && bad "multi-file cat dedup" || pass "multi-file cat passes through"
+  quiet_cmd_dedup "" "cat $CF" >/dev/null && bad "no-session dedup" || pass "no-session passes through"
+  # cross-tool: a Read then a cat of the same unchanged file is recognised
+  printf 'x\n' > "$QUIET_LOG_DIR/shared"
+  quiet_dedup_check "sessX" "$QUIET_LOG_DIR/shared" "" "" >/dev/null   # seed via Read path
+  out=$(quiet_cmd_dedup "sessX" "cat $QUIET_LOG_DIR/shared") \
+    && printf '%s' "$out" | grep -q 'unchanged' && pass "cat after Read deduped (shared state)" || bad "cross-tool dedup"
+  rm -rf "$QUIET_LOG_DIR"
+)
+
 echo "== deterministic-first skill =="
 SK="$ROOT/skills/deterministic-first/SKILL.md"
 [ -f "$SK" ] && pass "skill file exists" || bad "skill file exists"

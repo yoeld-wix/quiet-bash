@@ -39,3 +39,27 @@ quiet_dedup_check() {
   } > "${state}.tmp" 2>/dev/null && mv "${state}.tmp" "$state" 2>/dev/null
   return 1
 }
+
+# quiet_cmd_dedup <session_id> <cmd>
+#   The Bash-path twin of quiet_dedup_check: a plain repeat read of ONE unchanged
+#   file via cat/bat/less/more/head/tail (no pipe/redirect/glob/chaining) is bytes
+#   already in context — re-running just re-bills them. On an unchanged repeat,
+#   prints a rewritten command (`echo <stub>`) and returns 0; else returns 1.
+#   Shares dedup state with quiet_dedup_check, so a `cat X` after a `Read X`
+#   (or vice-versa) is recognised. Lossless (content above; file on disk).
+quiet_cmd_dedup() {
+  local sid="$1" cmd="$2" tok f="" files=0
+  [ -n "$sid" ] || return 1
+  case "$cmd" in *'|'*|*'>'*|*'<'*|*'$('*|*'`'*|*';'*|*'&'*|*'*'*|*'?'*|*'['*) return 1 ;; esac
+  printf '%s' "$cmd" | grep -qE '^[[:space:]]*(cat|bat|less|more|head|tail)([[:space:]]|$)' || return 1
+  for tok in $cmd; do
+    case "$tok" in -*) ;; *) if [ -f "$tok" ]; then f="$tok"; files=$((files+1)); fi ;; esac
+  done
+  [ "$files" = 1 ] || return 1           # exactly one file → safe to dedup
+  local stub
+  if stub=$(quiet_dedup_check "$sid" "$f" "" ""); then
+    printf 'echo %q' "$stub"
+    return 0
+  fi
+  return 1
+}

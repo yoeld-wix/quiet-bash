@@ -20,8 +20,11 @@ quiet_prune
 
 input=$(cat)
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
+sid=$(printf '%s' "$input" | jq -r '.session_id // empty')
 
-if rewritten=$(quiet_rewrite "$cmd"); then
+# A plain repeat read of an unchanged file is already in context → stub it.
+# Otherwise fall through to the normal verbose-command rewrite.
+if rewritten=$(quiet_cmd_dedup "$sid" "$cmd") || rewritten=$(quiet_rewrite "$cmd"); then
   jq -n --arg c "$rewritten" \
     '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {command: $c}}}'
 fi
