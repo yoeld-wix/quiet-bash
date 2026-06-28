@@ -37,10 +37,13 @@ meta=$(printf '%s' "$input" | jq -r '
      else "other" end),
   (.tool_name // "tool"),
   (.tool_input.path // .tool_input.file_path // ""),
+  (.session_id // ""),
+  (.tool_input.offset // ""),
+  (.tool_input.limit // ""),
   (.tool_response | if type=="string" then .
      else ((.content // []) | map(select(.type=="text") | .text) | join("\n")) end)
 ' 2>/dev/null)
-{ IFS= read -r shape; IFS= read -r tool; IFS= read -r path; text=$(cat); } <<EOF
+{ IFS= read -r shape; IFS= read -r tool; IFS= read -r path; IFS= read -r sid; IFS= read -r off; IFS= read -r lim; text=$(cat); } <<EOF
 $meta
 EOF
 
@@ -62,7 +65,15 @@ if [ "$tool" = "Read" ]; then
       esac
     fi
   fi
-  [ -z "$summary" ] && exit 0   # non-source / small Read → pass through untouched
+  if [ -z "$summary" ]; then
+    # Not outlined → would re-send full content. If this is an unchanged repeat
+    # read in the same session, replace it with a stub (content is already above).
+    if dstub=$(quiet_dedup_check "$sid" "$path" "$off" "$lim"); then
+      summary="$dstub"
+    else
+      exit 0   # non-source / small / first-seen Read → pass through untouched
+    fi
+  fi
 else
   # MCP / WebFetch / WebSearch: collapse large JSON, head/tail large text (as before).
   summary=$(quiet_result_summarize "$text" "$tool") || exit 0

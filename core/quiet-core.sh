@@ -29,6 +29,9 @@
 # Absolute dir of this core (so quiet_rewrite can point at sibling scripts).
 QUIET_CORE_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || QUIET_CORE_DIR=.
 
+# Duplicate-read dedup helper (defines _quiet_mtime, quiet_dedup_check).
+[ -r "$QUIET_CORE_DIR/quiet-dedup.sh" ] && . "$QUIET_CORE_DIR/quiet-dedup.sh"
+
 # ── Prune stale redirect logs ────────────────────────────────────────────────
 quiet_prune() {
   # Throttle: a full dir scan on every hook invocation costs ~40ms. Skip it if we
@@ -315,6 +318,23 @@ quiet_rewrite() {
   local find_re='(^|[[:space:];&|(])find[[:space:]]+[^-]'
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* && $cmd != *-exec* ]] \
      && { [[ $cmd =~ $lsr_re ]] || [[ $cmd =~ $tree_re ]] || [[ $cmd =~ $find_re ]]; }; then
+    _quiet_wrap_search "$cmd"
+    return 0
+  fi
+
+  # ── recursive-search path: grep -r / rg can flood context; VERBATIM-wrap ──
+  # The command runs exactly as written (no flag rewrite → no changed match
+  # semantics); only a large RESULT is collapsed (spill + first-N + count +
+  # grep pointer), small results still show inline. Lossless. Only recursive
+  # searches (the flooding ones); bounded/piped/listing forms pass through.
+  local grep_re='(^|[[:space:];&|(/])(grep|egrep|fgrep)[[:space:]]'
+  local recflag_re='[[:space:]](-[A-Za-z]*[rR][A-Za-z]*|--recursive)([[:space:]]|$)'
+  local rg_re='(^|[[:space:];&|(/])(rg|ripgrep)[[:space:]]'
+  # Output-bounding flags (count/list/quiet) → already small, leave alone.
+  local sbound_re='[[:space:]](-[A-Za-z]*[clLq][A-Za-z]*|--count|--files-with-matches|--files-without-match|--quiet)([[:space:]]|$)'
+  if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* && $cmd != *-exec* ]] \
+     && { { [[ $cmd =~ $grep_re ]] && [[ $cmd =~ $recflag_re ]]; } || [[ $cmd =~ $rg_re ]]; } \
+     && ! [[ $cmd =~ $sbound_re ]]; then
     _quiet_wrap_search "$cmd"
     return 0
   fi

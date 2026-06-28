@@ -42,6 +42,8 @@ It quiets the **four things that bloat an agent's context**:
 | **Large tool results** — MCP, `WebFetch`/`WebSearch`, API payloads | the whole payload | spilled + a collapsed preview |
 | **Long injected prompts** — big `CLAUDE.md`/`AGENTS.md`, hook prompts | re-sent in full every turn | a short stub; reference loads on demand |
 | **Read-to-find work** — locating, counting, extracting, verifying over files/logs | model reads the haystack into context | `deterministic-first` skill + `quiet-verify`/`quiet-agg` return just the answer |
+| **Repeated & blocking work** — re-reading unchanged files, judging logs, polling | model re-reads / re-judges / re-polls every turn | dedup of unchanged re-reads · `quiet-check` verdict+tally · `quiet-wait` one-shot poll |
+| **Lookups & archaeology** — config values, git history, recursive search | model reads whole files / scrolls full logs / floods on `grep -r` | `quiet-conf` · `quiet-hist`/`quiet-blame` · recursive `grep`/`rg` auto-collapsed |
 
 ## Highlights
 

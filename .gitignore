@@ -1,4 +1,6 @@
 bench/*-runs.jsonl
 bench/*.log
 bench/agentic*-report.md
+
+# superpowers scratch (specs/plans are committed under docs/; ledger+research are scratch)
 .superpowers/

@@ -19,7 +19,7 @@ for c in "yarn test" "pnpm run build" "bun test" "pytest -q" "cargo build --rele
 done
 
 echo "== core: should PASS THROUGH =="
-for c in "ls -la" "cat f.txt" "grep -r x ." "git status" "gh pr list" "echo hi" "pwd" \
+for c in "ls -la" "cat f.txt" "grep x f.txt" "git status" "gh pr list" "echo hi" "pwd" \
          "cd /tmp" "which node" "git diff --stat" "git log --oneline" "yarn info x"; do
   if quiet_rewrite "$c" >/dev/null; then bad "should pass: $c"; else pass "pass: $c"; fi
 done
@@ -30,7 +30,7 @@ for c in "gh run view 123 --log" "gh run view 123 --log-failed" "gh pr diff 45" 
   if quiet_rewrite "$c" >/dev/null; then pass "wrap: $c"; else bad "should wrap: $c"; fi
 done
 for c in "gh pr list" "gh run view 123" "gh pr diff 45 | head" "gh run view 1 --log > out.txt" \
-         "gh run view 1 --logout" "ls -la" "ls" "find --help" "grep -r x ." "rg foo" \
+         "gh run view 1 --logout" "ls -la" "ls" "find --help" \
          "find . -exec chmod 644 {} +" "yarn workspaces tree"; do
   if quiet_rewrite "$c" >/dev/null; then bad "should pass: $c"; else pass "pass: $c"; fi
 done
@@ -48,6 +48,15 @@ for c in "curl https://x | jq ." "curl -o out.json https://x" "curl -O https://x
   if quiet_rewrite "$c" >/dev/null; then bad "should pass: $c"; else pass "pass: $c"; fi
 done
 quiet_rewrite 'd=$(curl https://x)' >/dev/null && bad "cmd-subst curl should pass through" || pass "cmd-subst curl passes through"
+
+echo "== core: recursive-search collapse (grep -r / rg) =="
+for c in "grep -r x ." "grep -R foo src" "grep -rn TODO ." "rg foo" "rg bar src" "rg -n foo"; do
+  if quiet_rewrite "$c" >/dev/null; then pass "wrap: $c"; else bad "should wrap: $c"; fi
+done
+for c in "grep x f.txt" "grep -rl x ." "grep -c x ." "rg -l foo" "rg -c foo" "rg foo | head" \
+         "grep -r x . > out" "grep -r x . | wc -l" 'd=$(rg foo)'; do
+  if quiet_rewrite "$c" >/dev/null; then bad "should pass: $c"; else pass "pass: $c"; fi
+done
 
 echo "== adapters: output shape for 'yarn test' + passthrough for 'ls -la' =="
 EV='{"tool_input":{"command":"yarn test"}}'
@@ -450,6 +459,32 @@ out=$("$QV" "$VF" 'FAILURE'); st=$?
 "$QV" "$VF" '[' >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-verify invalid regex exit 2" || bad "quiet-verify invalid regex exit 2"
 rm -f "$VF"
 
+echo "== quiet-check =="
+QC="$ROOT/core/quiet-check.sh"
+CF=$(mktemp); printf 'building...\nWARNING deprecated\nERROR boom\nFAILED step 2\nok done\n' > "$CF"
+out=$("$QC" "$CF"); st=$?
+{ [ "$st" -eq 1 ] && printf '%s' "$out" | grep -q 'FAIL' && printf '%s' "$out" | grep -qE '2 error' && printf '%s' "$out" | grep -qE '1 warning'; } \
+  && pass "quiet-check FAIL + tally + exit 1" || bad "quiet-check fail-case"
+printf '%s' "$out" | grep -q 'first 5 error' && pass "quiet-check shows first errors" || bad "quiet-check first errors"
+GF=$(mktemp); printf 'building...\nall good\nok done\n' > "$GF"
+out=$("$QC" "$GF"); st=$?
+{ [ "$st" -eq 0 ] && printf '%s' "$out" | grep -q 'PASS' && printf '%s' "$out" | grep -qE '0 error'; } \
+  && pass "quiet-check PASS + exit 0" || bad "quiet-check pass-case"
+"$QC" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-check usage exit 2" || bad "quiet-check usage"
+"$QC" /no/such/file >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-check missing-file exit 2" || bad "quiet-check missing-file"
+QUIET_CHECK_ERROR_RE='[' "$QC" "$CF" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-check invalid regex exit 2" || bad "quiet-check invalid regex"
+QUIET_CHECK_FIRST_K=abc "$QC" "$CF" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-check non-numeric QUIET_CHECK_FIRST_K exit 2" || bad "quiet-check non-numeric QUIET_CHECK_FIRST_K"
+rm -f "$CF" "$GF"
+
+echo "== quiet-wait =="
+QW="$ROOT/core/quiet-wait.sh"
+out=$("$QW" 'true' --timeout 2 --interval 1); st=$?
+{ [ "$st" -eq 0 ] && printf '%s' "$out" | grep -q 'condition met'; } && pass "quiet-wait success exit 0" || bad "quiet-wait success"
+out=$("$QW" 'false' --timeout 1 --interval 1); st=$?
+{ [ "$st" -eq 1 ] && printf '%s' "$out" | grep -q 'TIMEOUT'; } && pass "quiet-wait timeout exit 1" || bad "quiet-wait timeout"
+"$QW" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-wait usage exit 2" || bad "quiet-wait usage"
+"$QW" 'true' --timeout abc >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-wait bad timeout exit 2" || bad "quiet-wait bad timeout"
+
 echo "== quiet-agg =="
 QA="$ROOT/core/quiet-agg.sh"
 AF=$(mktemp); printf 'E101 boom\nE200 nope\nE101 again\nE101 third\nE200 second\n' > "$AF"
@@ -466,6 +501,49 @@ out=$("$QA" "$AF" 'ZZZ'); st=$?
 "$QA" "$AF" 'E[0-9]+' abc >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-agg n=abc exit 2" || bad "quiet-agg n=abc exit 2"
 "$QA" "$AF" '[' >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-agg invalid regex exit 2" || bad "quiet-agg invalid regex exit 2"
 rm -f "$AF"
+
+echo "== quiet-dedup =="
+( # subshell so QUIET_LOG_DIR override is local
+  export QUIET_LOG_DIR; QUIET_LOG_DIR=$(mktemp -d)
+  . "$ROOT/core/quiet-dedup.sh"
+  DF="$QUIET_LOG_DIR/data.txt"; printf 'hello\nworld\n' > "$DF"
+  # first read: pass through (no output), returns 1
+  o1=$(quiet_dedup_check "sessA" "$DF" "" ""); r1=$?
+  { [ "$r1" -eq 1 ] && [ -z "$o1" ]; } && pass "dedup first read passes through" || bad "dedup first read"
+  # second identical read: dedup (output + returns 0)
+  o2=$(quiet_dedup_check "sessA" "$DF" "" ""); r2=$?
+  { [ "$r2" -eq 0 ] && printf '%s' "$o2" | grep -q 'unchanged since you read it'; } && pass "dedup repeat read deduped" || bad "dedup repeat read"
+  # changed mtime+content: pass through
+  sleep 1; printf 'hello\nworld\nmore\n' > "$DF"
+  o3=$(quiet_dedup_check "sessA" "$DF" "" ""); r3=$?
+  [ "$r3" -eq 1 ] && pass "dedup changed file passes through" || bad "dedup changed file"
+  # different range: different key → pass through
+  o4=$(quiet_dedup_check "sessA" "$DF" "10" "20"); r4=$?
+  [ "$r4" -eq 1 ] && pass "dedup different range passes through" || bad "dedup different range"
+  # no session id: disabled
+  o5=$(quiet_dedup_check "" "$DF" "" ""); r5=$?
+  [ "$r5" -eq 1 ] && pass "dedup no-session disabled" || bad "dedup no-session"
+  rm -rf "$QUIET_LOG_DIR"
+)
+
+echo "== adapter: duplicate-read dedup =="
+(
+  export QUIET_LOG_DIR; QUIET_LOG_DIR=$(mktemp -d)
+  BIG="$QUIET_LOG_DIR/big.log"
+  awk 'BEGIN{for(i=0;i<4000;i++)print "line "i" some filler text to exceed the outline threshold"}' > "$BIG"
+  CONTENT=$(cat "$BIG")
+  EV=$(jq -n --arg p "$BIG" --arg t "$CONTENT" --arg s "sessDED" \
+        '{session_id:$s, tool_name:"Read", tool_input:{file_path:$p}, tool_response:$t}')
+  # first event: pass through (adapter prints nothing)
+  o1=$(printf '%s' "$EV" | "$ROOT/adapters/claude-code-result.sh")
+  [ -z "$o1" ] && pass "adapter first read passes through" || bad "adapter first read"
+  # second identical event: deduped (adapter prints replacement with the stub)
+  o2=$(printf '%s' "$EV" | "$ROOT/adapters/claude-code-result.sh")
+  printf '%s' "$o2" | jq -e '.hookSpecificOutput.updatedToolOutput' >/dev/null 2>&1 \
+    && printf '%s' "$o2" | grep -q 'unchanged since you read it' \
+    && pass "adapter repeat read deduped" || bad "adapter repeat read"
+  rm -rf "$QUIET_LOG_DIR"
+)
 
 echo "== deterministic-first skill =="
 SK="$ROOT/skills/deterministic-first/SKILL.md"
@@ -524,6 +602,58 @@ if printf '%s' "$me_rep" | grep -Eq "arm A:.*→ SHIP"; then
   pass "report: zero-regression + cheaper → SHIP verdict"
 else bad "report: cheaper zero-regression arm should yield SHIP"; fi
 rm -f "$me_tmp"
+echo "== composition: quiet-check over a spill =="
+. "$ROOT/core/quiet-core.sh"
+MSG=$(quiet_run sh -c 'echo building; echo "ERROR nope"; echo "WARNING meh"; exit 1' 2>/dev/null)
+LOG=$(printf '%s' "$MSG" | grep -oE "${QUIET_LOG_DIR%/}/+${QUIET_LOG_PREFIX}[A-Za-z0-9]+" | head -1)
+{ [ -n "$LOG" ] && [ -f "$LOG" ]; } && pass "spill log created (check)" || bad "spill log created (check)"
+out=$("$ROOT/core/quiet-check.sh" "$LOG"); st=$?
+{ [ "$st" -eq 1 ] && printf '%s' "$out" | grep -q 'FAIL' && printf '%s' "$out" | grep -qE '1 error'; } \
+  && pass "quiet-check recovers verdict+tally from spill" || bad "quiet-check over spill"
+
+echo "== quiet-conf =="
+QCF="$ROOT/core/quiet-conf.sh"
+JF=$(mktemp); mv "$JF" "$JF.json"; JF="$JF.json"
+printf '{"name":"x","scripts":{"test":"jest"},"dependencies":{"react":"18.2.0"}}' > "$JF"
+[ "$("$QCF" "$JF" '.scripts.test')" = "jest" ] && pass "quiet-conf json jq-path" || bad "quiet-conf json jq-path"
+[ "$("$QCF" "$JF" 'dependencies.react')" = "18.2.0" ] && pass "quiet-conf json bare-key (dot prepended)" || bad "quiet-conf json bare-key"
+"$QCF" "$JF" '.nope' >/dev/null 2>&1; [ $? -eq 1 ] && pass "quiet-conf missing key exit 1" || bad "quiet-conf missing key"
+EF=$(mktemp); printf 'FOO=bar\nexport TOKEN="abc123"\n' > "$EF"
+[ "$("$QCF" "$EF" 'FOO')" = "bar" ] && pass "quiet-conf env plain" || bad "quiet-conf env plain"
+[ "$("$QCF" "$EF" 'TOKEN')" = "abc123" ] && pass "quiet-conf env export+quotes" || bad "quiet-conf env quotes"
+"$QCF" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-conf usage exit 2" || bad "quiet-conf usage"
+"$QCF" /no/such x >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-conf missing-file exit 2" || bad "quiet-conf missing-file"
+# false/empty/"" values must not be misreported as "not found"
+JF2=$(mktemp); mv "$JF2" "$JF2.json"; JF2="$JF2.json"
+printf '{"flag":false,"empty":"","n":0}' > "$JF2"
+[ "$("$QCF" "$JF2" .flag)" = "false" ] && pass "quiet-conf json false value" || bad "quiet-conf json false value"
+"$QCF" "$JF2" .empty >/dev/null 2>&1; [ $? -eq 0 ] && pass "quiet-conf json empty-string exit 0" || bad "quiet-conf json empty-string exit 0"
+[ "$("$QCF" "$JF2" .n)" = "0" ] && pass "quiet-conf json zero value" || bad "quiet-conf json zero value"
+# syntactically bad jq path → exit 2
+"$QCF" "$JF2" '.a[' >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-conf bad jq path exit 2" || bad "quiet-conf bad jq path exit 2"
+# env key with regex metacharacters must not match the wrong line
+EF2=$(mktemp); printf 'FOO.BAR=wrong\nFOO_BAR=right\n' > "$EF2"
+[ "$("$QCF" "$EF2" 'FOO_BAR')" = "right" ] && pass "quiet-conf env key regex-escaped" || bad "quiet-conf env key regex-escaped"
+rm -f "$JF" "$EF" "$JF2" "$EF2"
+
+echo "== quiet-hist / quiet-blame =="
+QH="$ROOT/core/quiet-hist.sh"; QB="$ROOT/core/quiet-blame.sh"
+out=$("$QH" README.md -n 3); st=$?
+{ [ "$st" -eq 0 ] && [ -n "$out" ]; } && pass "quiet-hist lists commits" || bad "quiet-hist lists"
+"$QH" --pick quiet_rewrite core/quiet-core.sh >/dev/null 2>&1; [ $? -eq 0 ] && pass "quiet-hist pickaxe runs" || bad "quiet-hist pickaxe"
+"$QH" >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-hist usage exit 2" || bad "quiet-hist usage"
+"$QH" README.md -n abc >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-hist bad -n exit 2" || bad "quiet-hist bad -n"
+out=$("$QB" README.md 1 3); st=$?
+{ [ "$st" -eq 0 ] && [ -n "$out" ]; } && pass "quiet-blame shows range" || bad "quiet-blame range"
+"$QB" README.md 1 >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-blame usage exit 2" || bad "quiet-blame usage"
+"$QB" README.md a b >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-blame non-numeric exit 2" || bad "quiet-blame non-numeric"
+
+echo "== round-2 skill rows =="
+SKR="$ROOT/skills/deterministic-first/SKILL.md"
+for tok in 'quiet-conf' 'quiet-hist' 'tsort'; do
+  grep -qF "$tok" "$SKR" 2>/dev/null && pass "skill mentions $tok" || bad "skill missing $tok"
+done
+grep -q 'Repeated & blocking work' "$ROOT/README.md" 2>/dev/null && pass "README round-1 row intact" || bad "README row"
 
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
