@@ -885,5 +885,209 @@ for tok in 'quiet-patch' 'quiet-applies'; do
   grep -qF "$tok" "$SKF" 2>/dev/null && pass "skill mentions $tok" || bad "skill missing $tok"
 done
 
+echo "== observe (stage 1): fingerprint =="
+c1=$(quiet_observe_canon 'grep -n "foo" src/a.ts')
+c2=$(quiet_observe_canon 'grep -n "bar" src/b.ts')
+[ "$c1" = "grep -n <STR> <PATH>" ] && pass "canon: grep normalizes literals" || bad "canon grep got: '$c1'"
+[ "$c1" = "$c2" ] && pass "canon: clusters differing literals" || bad "canon cluster: '$c1' vs '$c2'"
+[ "$(quiet_observe_canon '/usr/bin/curl https://x/api')" = "curl <URL>" ] && pass "canon: basenames argv0 + URL" || bad "canon url: '$(quiet_observe_canon '/usr/bin/curl https://x/api')'"
+[ "$(quiet_observe_canon 'git show 1a2b3c4d')" = "git show <HASH>" ] && pass "canon: hex -> <HASH>" || bad "canon hash: '$(quiet_observe_canon 'git show 1a2b3c4d')'"
+f1=$(quiet_observe_fingerprint 'npm test'); f2=$(quiet_observe_fingerprint 'npm test')
+[ -n "$f1" ] && [ "$f1" = "$f2" ] && pass "fp: deterministic" || bad "fp deterministic: '$f1' vs '$f2'"
+[ "$f1" != "$(quiet_observe_fingerprint 'npm run build')" ] && pass "fp: distinguishes commands" || bad "fp does not distinguish"
+
+echo "== observe (stage 1): config flag + ledger =="
+obs_tmp=$(mktemp -d)
+export QUIET_OBSERVE_LEDGER="$obs_tmp/observe.jsonl"
+export QUIET_CONFIG_FILE="$obs_tmp/config"
+quiet_observe_enabled && bad "should be disabled without config" || pass "disabled by default (no config)"
+quiet_observe_record 'npm test' 1 100
+[ ! -f "$QUIET_OBSERVE_LEDGER" ] && pass "no ledger written while disabled" || bad "ledger written while disabled"
+printf 'observe = on\n' > "$QUIET_CONFIG_FILE"
+quiet_observe_enabled && pass "enabled via config file toggle" || bad "config toggle did not enable"
+quiet_observe_record 'npm test' 1 100
+quiet_observe_record 'npm test' 1 120
+quiet_observe_record 'npm run build' 1 50
+[ -f "$QUIET_OBSERVE_LEDGER" ] && pass "ledger created when enabled" || bad "ledger missing when enabled"
+lc=$(wc -l < "$QUIET_OBSERVE_LEDGER" | tr -d ' ')
+[ "$lc" = "3" ] && pass "appends one row per call (3)" || bad "row count = $lc"
+head -1 "$QUIET_OBSERVE_LEDGER" | jq -e '.fp and .canon and (.bytes==100)' >/dev/null 2>&1 && pass "row is valid JSON with fp+bytes" || bad "row JSON invalid: $(head -1 "$QUIET_OBSERVE_LEDGER")"
+rn=$(quiet_observe_report | awk '/npm test$/{print $1}')
+[ "$rn" = "2" ] && pass "report ranks recurrence (npm test x2)" || bad "report recurrence = '$rn'"
+printf 'observe = off\n' > "$QUIET_CONFIG_FILE"
+quiet_observe_enabled && bad "off value should disable" || pass "observe = off disables"
+unset QUIET_OBSERVE_LEDGER QUIET_CONFIG_FILE
+rm -rf "$obs_tmp"
+
+echo "== observe (stage 1): adapter integration =="
+obs_tmp=$(mktemp -d)
+export QUIET_OBSERVE_LEDGER="$obs_tmp/observe.jsonl"
+export QUIET_CONFIG_FILE="$obs_tmp/config"
+printf 'observe = on\n' > "$QUIET_CONFIG_FILE"
+printf '{"tool_input":{"command":"ls -la"},"session_id":"s1"}' | bash "$ROOT/adapters/claude-code.sh" >/dev/null 2>&1
+printf '{"tool_input":{"command":"npm test"},"session_id":"s1"}' | bash "$ROOT/adapters/claude-code.sh" >/dev/null 2>&1
+arows=$(wc -l < "$QUIET_OBSERVE_LEDGER" 2>/dev/null | tr -d ' ')
+[ "$arows" = "2" ] && pass "adapter records every bash command" || bad "adapter rows = '$arows'"
+quiet_observe_report | grep -q 'npm test' && pass "adapter-recorded pattern appears in report" || bad "adapter pattern missing from report"
+# disabled adapter must not write
+printf 'observe = off\n' > "$QUIET_CONFIG_FILE"; : > "$QUIET_OBSERVE_LEDGER"
+printf '{"tool_input":{"command":"npm test"},"session_id":"s1"}' | bash "$ROOT/adapters/claude-code.sh" >/dev/null 2>&1
+[ ! -s "$QUIET_OBSERVE_LEDGER" ] && pass "adapter records nothing while disabled" || bad "adapter wrote while disabled"
+unset QUIET_OBSERVE_LEDGER QUIET_CONFIG_FILE
+rm -rf "$obs_tmp"
+
+echo "== observe (stage 1): canon wrappers + CLI + quiet_run =="
+[ "$(quiet_observe_canon 'command npm test')" = "npm test" ] && pass "canon strips 'command'" || bad "canon command: '$(quiet_observe_canon 'command npm test')'"
+[ "$(quiet_observe_canon 'env FOO=1 npm test')" = "npm test" ] && pass "canon strips env+assignment" || bad "canon env: '$(quiet_observe_canon 'env FOO=1 npm test')'"
+[ "$(quiet_observe_canon '/abs/path/pytest -q')" = "pytest -q" ] && pass "canon basenames abs argv0" || bad "canon abs: '$(quiet_observe_canon '/abs/path/pytest -q')'"
+obs_tmp=$(mktemp -d)
+export QUIET_OBSERVE_LEDGER="$obs_tmp/observe.jsonl"
+export QUIET_CONFIG_FILE="$obs_tmp/config"
+printf 'observe = on\n' > "$QUIET_CONFIG_FILE"
+quiet_observe_record 'npm test' 1 100
+bash "$ROOT/core/quiet-observe.sh" report | grep -q 'npm test' && pass "CLI: report runs" || bad "CLI report failed"
+bash "$ROOT/core/quiet-observe.sh" status | grep -qi 'enabled' && pass "CLI: status reports enabled" || bad "CLI status: $(bash "$ROOT/core/quiet-observe.sh" status 2>&1)"
+: > "$QUIET_OBSERVE_LEDGER"
+quiet_run sh -c 'echo hello; echo world' >/dev/null 2>&1
+qrb=$(tail -1 "$QUIET_OBSERVE_LEDGER" 2>/dev/null | jq -r '.bytes' 2>/dev/null)
+{ [ -n "$qrb" ] && [ "$qrb" -gt 0 ] 2>/dev/null; } && pass "quiet_run records real bytes" || bad "quiet_run bytes='$qrb'"
+unset QUIET_OBSERVE_LEDGER QUIET_CONFIG_FILE
+rm -rf "$obs_tmp"
+
+echo "== observe (stage 1): codex/gemini/copilot adapters =="
+obs_tmp=$(mktemp -d)
+export QUIET_OBSERVE_LEDGER="$obs_tmp/observe.jsonl"
+export QUIET_CONFIG_FILE="$obs_tmp/config"
+printf 'observe = on\n' > "$QUIET_CONFIG_FILE"
+: > "$QUIET_OBSERVE_LEDGER"; printf '%s' '{"tool_input":{"command":"npm test"}}' | bash "$ROOT/adapters/codex.sh" >/dev/null 2>&1
+[ -s "$QUIET_OBSERVE_LEDGER" ] && pass "codex adapter records" || bad "codex did not record"
+: > "$QUIET_OBSERVE_LEDGER"; printf '%s' '{"tool_input":{"command":"pytest -q"}}' | bash "$ROOT/adapters/gemini.sh" >/dev/null 2>&1
+[ -s "$QUIET_OBSERVE_LEDGER" ] && pass "gemini adapter records" || bad "gemini did not record"
+: > "$QUIET_OBSERVE_LEDGER"; printf '%s' '{"toolName":"bash","toolArgs":"{\"command\":\"cargo build\"}"}' | bash "$ROOT/adapters/copilot.sh" >/dev/null 2>&1
+[ -s "$QUIET_OBSERVE_LEDGER" ] && pass "copilot adapter records" || bad "copilot did not record"
+unset QUIET_OBSERVE_LEDGER QUIET_CONFIG_FILE
+rm -rf "$obs_tmp"
+
+echo "== reuse (stage 3): eligibility =="
+rtmp=$(mktemp -d); printf '{"a":1}\n' > "$rtmp/data.json"
+export QUIET_REUSE_DIR="$rtmp/.quiet-cache/reuse"
+export QUIET_CONFIG_FILE="$rtmp/config"; printf 'reuse = on\n' > "$QUIET_CONFIG_FILE"
+quiet_reuse_enabled && pass "reuse: enabled via config" || bad "reuse flag not enabled"
+( cd "$rtmp" && quiet_reuse_eligible 'jq . data.json' )      && pass "eligible: read-only cmd over a file" || bad "jq should be eligible"
+( cd "$rtmp" && quiet_reuse_eligible 'rm data.json' )        && bad "rm must be denied"        || pass "denylist: rm denied"
+( cd "$rtmp" && quiet_reuse_eligible 'git log data.json' )   && bad "git must be denied"       || pass "denylist: git denied"
+( cd "$rtmp" && quiet_reuse_eligible 'npm test' )            && bad "npm test must be denied"  || pass "denylist: npm test denied"
+( cd "$rtmp" && quiet_reuse_eligible 'jq . data.json | head')&& bad "pipe must be ineligible"  || pass "operator: pipe ineligible"
+( cd "$rtmp" && quiet_reuse_eligible 'cat data.json > o' )   && bad "redirect ineligible"      || pass "operator: redirect ineligible"
+( cd "$rtmp" && quiet_reuse_eligible 'echo hi' )             && bad "no-file-input ineligible" || pass "no file input → ineligible"
+( cd "$rtmp" && quiet_reuse_eligible 'grep TODO *.js' )      && bad "glob-only ineligible"     || pass "glob-only input → ineligible"
+
+echo "== reuse (stage 3): serve + tiered freshness (end-to-end) =="
+rw1=$( cd "$rtmp" && quiet_reuse_rewrite 'jq -c . data.json' )
+{ echo "$rw1" | grep -q 'quiet-reuse-run' && ! echo "$rw1" | grep -q serve; } && pass "miss → run+cache rewrite" || bad "miss rewrite: $rw1"
+( cd "$rtmp" && eval "$rw1" >"$rtmp/o1" 2>/dev/null )
+grep -q '{"a":1}' "$rtmp/o1" && pass "miss rewrite runs & outputs" || bad "miss output: $(cat "$rtmp/o1")"
+rw2=$( cd "$rtmp" && quiet_reuse_rewrite 'jq -c . data.json' )
+echo "$rw2" | grep -q serve && pass "second call → serve rewrite (cache hit)" || bad "hit rewrite: $rw2"
+( cd "$rtmp" && eval "$rw2" >"$rtmp/o2" 2>/dev/null )
+grep -q '{"a":1}' "$rtmp/o2" && pass "serve returns cached output" || bad "serve output: $(cat "$rtmp/o2")"
+# tiered freshness: same-size edit (content differs) must invalidate via content-hash
+printf '{"a":9}\n' > "$rtmp/data.json"
+rw3=$( cd "$rtmp" && quiet_reuse_rewrite 'jq -c . data.json' )
+{ echo "$rw3" | grep -q 'quiet-reuse-run' && ! echo "$rw3" | grep -q serve; } && pass "changed input → miss (content-hash tier)" || bad "stale rewrite: $rw3"
+# disabled → no rewrite at all
+printf 'reuse = off\n' > "$QUIET_CONFIG_FILE"
+( cd "$rtmp" && quiet_reuse_rewrite 'jq -c . data.json' >/dev/null ) && bad "disabled reuse must not rewrite" || pass "reuse off → no rewrite"
+unset QUIET_REUSE_DIR QUIET_CONFIG_FILE
+rm -rf "$rtmp"
+
+echo "== reuse (stage 3): adapter serves cache =="
+rtmp=$(mktemp -d); printf '{"a":1}\n' > "$rtmp/data.json"
+export QUIET_REUSE_DIR="$rtmp/.quiet-cache/reuse"
+export QUIET_CONFIG_FILE="$rtmp/config"; printf 'reuse = on\n' > "$QUIET_CONFIG_FILE"
+ev='{"tool_input":{"command":"jq -c . data.json"},"session_id":"s1"}'
+o1=$( cd "$rtmp" && printf '%s' "$ev" | bash "$ROOT/adapters/claude-code.sh" 2>/dev/null )
+echo "$o1" | jq -e '.hookSpecificOutput.updatedInput.command | test("quiet-reuse-run")' >/dev/null 2>&1 && pass "adapter: 1st call rewrites to run+cache" || bad "adapter reuse miss: $o1"
+( cd "$rtmp" && eval "$(echo "$o1" | jq -r '.hookSpecificOutput.updatedInput.command')" >/dev/null 2>&1 )
+o2=$( cd "$rtmp" && printf '%s' "$ev" | bash "$ROOT/adapters/claude-code.sh" 2>/dev/null )
+echo "$o2" | jq -e '.hookSpecificOutput.updatedInput.command | test("serve")' >/dev/null 2>&1 && pass "adapter: 2nd call serves cached" || bad "adapter reuse hit: $o2"
+unset QUIET_REUSE_DIR QUIET_CONFIG_FILE
+rm -rf "$rtmp"
+
+echo "== reuse (stage 3): feedback / reputation =="
+rtmp=$(mktemp -d); printf 'hello world\n' > "$rtmp/f.txt"
+export QUIET_REUSE_DIR="$rtmp/.quiet-cache/reuse"
+export QUIET_REUSE_EVENTS="$rtmp/.quiet-cache/reuse-events.jsonl"
+export QUIET_CONFIG_FILE="$rtmp/config"; printf 'reuse = on\n' > "$QUIET_CONFIG_FILE"
+( cd "$rtmp" && eval "$(quiet_reuse_rewrite 'wc -w f.txt')" >/dev/null 2>&1 )   # miss → run+cache
+( cd "$rtmp" && eval "$(quiet_reuse_rewrite 'wc -w f.txt')" >/dev/null 2>&1 )   # hit → serve
+[ -f "$QUIET_REUSE_EVENTS" ] && pass "reuse: events ledger written" || bad "no events ledger"
+h=$(jq -s '[.[]|select(.event=="hit")]|length' "$QUIET_REUSE_EVENTS" 2>/dev/null)
+m=$(jq -s '[.[]|select(.event=="miss")]|length' "$QUIET_REUSE_EVENTS" 2>/dev/null)
+{ [ "$h" = "1" ] && [ "$m" = "1" ]; } && pass "reuse: 1 hit + 1 miss recorded" || bad "hits=$h misses=$m"
+quiet_reuse_report | grep -q 'wc -w' && pass "reuse_report shows pattern + reputation" || bad "reuse_report missing pattern"
+bash "$ROOT/core/quiet-reuse.sh" report | grep -q 'wc -w' && pass "CLI: quiet-reuse report" || bad "CLI reuse report failed"
+bash "$ROOT/core/quiet-reuse.sh" status | grep -qi enabled && pass "CLI: quiet-reuse status" || bad "CLI reuse status: $(bash "$ROOT/core/quiet-reuse.sh" status 2>&1)"
+unset QUIET_REUSE_DIR QUIET_REUSE_EVENTS QUIET_CONFIG_FILE
+rm -rf "$rtmp"
+
+echo "== reuse (stage 3): codex/gemini/copilot serve too =="
+rtmp=$(mktemp -d); printf '{"a":1}\n' > "$rtmp/d.json"
+export QUIET_REUSE_DIR="$rtmp/.quiet-cache/reuse"
+export QUIET_REUSE_EVENTS="$rtmp/.quiet-cache/reuse-events.jsonl"
+export QUIET_CONFIG_FILE="$rtmp/config"; printf 'reuse = on\n' > "$QUIET_CONFIG_FILE"
+co=$( cd "$rtmp" && printf '%s' '{"tool_input":{"command":"jq -c . d.json"}}' | bash "$ROOT/adapters/codex.sh" 2>/dev/null )
+echo "$co" | jq -e '.hookSpecificOutput.updatedInput.command|test("quiet-reuse-run")' >/dev/null 2>&1 && pass "codex: reuse rewrite" || bad "codex reuse: $co"
+ge=$( cd "$rtmp" && printf '%s' '{"tool_input":{"command":"jq -c . d.json"}}' | bash "$ROOT/adapters/gemini.sh" 2>/dev/null )
+echo "$ge" | jq -e '.hookSpecificOutput.tool_input.command|test("quiet-reuse-run")' >/dev/null 2>&1 && pass "gemini: reuse rewrite" || bad "gemini reuse: $ge"
+cp=$( cd "$rtmp" && printf '%s' '{"toolName":"bash","toolArgs":"{\"command\":\"jq -c . d.json\"}"}' | bash "$ROOT/adapters/copilot.sh" 2>/dev/null )
+echo "$cp" | jq -e '.modifiedArgs.command|test("quiet-reuse-run")' >/dev/null 2>&1 && pass "copilot: reuse rewrite" || bad "copilot reuse: $cp"
+unset QUIET_REUSE_DIR QUIET_REUSE_EVENTS QUIET_CONFIG_FILE
+rm -rf "$rtmp"
+
+echo "== reuse (stage 3): correctness — distinct inputs never collide =="
+rtmp=$(mktemp -d); printf 'AAA\n' > "$rtmp/a.txt"; printf 'BBB\n' > "$rtmp/b.txt"
+export QUIET_REUSE_DIR="$rtmp/.quiet-cache/reuse"
+export QUIET_REUSE_EVENTS="$rtmp/.quiet-cache/ev.jsonl"
+export QUIET_CONFIG_FILE="$rtmp/config"; printf 'reuse = on\n' > "$QUIET_CONFIG_FILE"
+( cd "$rtmp" && eval "$(quiet_reuse_rewrite 'cat a.txt')" >/dev/null 2>&1 )   # cache a
+outb=$( cd "$rtmp" && eval "$(quiet_reuse_rewrite 'cat b.txt')" 2>/dev/null ) # must run b, not serve a
+echo "$outb" | grep -q BBB && pass "distinct files do NOT collide (no wrong hit)" || bad "WRONG HIT: cat b.txt -> $outb"
+unset QUIET_REUSE_DIR QUIET_REUSE_EVENTS QUIET_CONFIG_FILE
+rm -rf "$rtmp"
+
+echo "== reuse (stage 3): disk / memory controls =="
+rtmp=$(mktemp -d); mkdir -p "$rtmp/work"
+printf 'xxxxxxxx\n' > "$rtmp/work/big.txt"; printf 'p\n' > "$rtmp/work/p.txt"
+export QUIET_REUSE_DIR="$rtmp/reuse"
+export QUIET_REUSE_EVENTS="$rtmp/ev.jsonl"
+export QUIET_CONFIG_FILE="$rtmp/config"; printf 'reuse = on\n' > "$QUIET_CONFIG_FILE"
+nout(){ ls "$QUIET_REUSE_DIR"/*.out 2>/dev/null | wc -l | tr -d ' '; }
+# per-output cap: output bigger than cap must NOT be cached
+QUIET_REUSE_MAX_OUTPUT_BYTES=3 bash -c ':' ; export QUIET_REUSE_MAX_OUTPUT_BYTES=3
+( cd "$rtmp/work" && eval "$(quiet_reuse_rewrite 'cat big.txt')" >/dev/null 2>&1 )
+[ "$(nout)" = "0" ] && pass "per-output cap: oversize result not cached" || bad "oversize cached ($(nout) entries)"
+unset QUIET_REUSE_MAX_OUTPUT_BYTES
+# gc max-entries (LRU): 3 distinct cmds, cap 2 → gc leaves <=2
+printf '1\n'>"$rtmp/work/c1"; printf '2\n'>"$rtmp/work/c2"; printf '3\n'>"$rtmp/work/c3"
+for ff in c1 c2 c3; do ( cd "$rtmp/work" && eval "$(quiet_reuse_rewrite "cat $ff")" >/dev/null 2>&1 ); done
+[ "$(nout)" = "3" ] && pass "three distinct entries cached (keys are precise)" || bad "expected 3 entries, got $(nout)"
+QUIET_REUSE_MAX_ENTRIES=2 QUIET_REUSE_TTL_MINUTES=0 quiet_reuse_gc >/dev/null 2>&1
+{ [ "$(nout)" -le 2 ]; } && pass "gc evicts to max-entries cap" || bad "gc left $(nout) (>2)"
+# gc TTL: backdate one entry, evict by ttl
+oldf=$(ls "$QUIET_REUSE_DIR"/*.out 2>/dev/null | head -1)
+touch -t 202001010000 "$oldf" "${oldf%.out}.meta" 2>/dev/null
+QUIET_REUSE_TTL_MINUTES=1 QUIET_REUSE_MAX_ENTRIES=999 quiet_reuse_gc >/dev/null 2>&1
+[ ! -f "$oldf" ] && pass "gc TTL evicts stale entry" || bad "TTL did not evict"
+# ledger trim (memory bound): tiny cap + small keep → bounded lines
+printf 'observe = on\nreuse = on\n' > "$QUIET_CONFIG_FILE"
+export QUIET_OBSERVE_LEDGER="$rtmp/obs.jsonl"
+export QUIET_LEDGER_MAX_BYTES=200 QUIET_LEDGER_KEEP_LINES=10
+i=0; while [ "$i" -lt 60 ]; do quiet_observe_record "cmd$i f.txt" 1 100; i=$((i+1)); done
+ll=$(wc -l < "$QUIET_OBSERVE_LEDGER" | tr -d ' ')
+{ [ "$ll" -le 12 ]; } && pass "observe ledger trimmed to bound (<=12 lines)" || bad "ledger not bounded: $ll lines"
+unset QUIET_REUSE_DIR QUIET_REUSE_EVENTS QUIET_CONFIG_FILE QUIET_OBSERVE_LEDGER QUIET_LEDGER_MAX_BYTES QUIET_LEDGER_KEEP_LINES QUIET_REUSE_MAX_ENTRIES QUIET_REUSE_TTL_MINUTES
+rm -rf "$rtmp"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

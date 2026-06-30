@@ -21,8 +21,11 @@ quiet_prune
 input=$(cat)
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // .tool_input.cmd // empty')
 
-if rewritten=$(quiet_rewrite "$cmd"); then
+if rewritten=$(quiet_reuse_rewrite "$cmd") || rewritten=$(quiet_rewrite "$cmd"); then
+  quiet_observe_record "$cmd" 1
   jq -n --arg c "$rewritten" \
     '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: {command: $c}}}'
+else
+  quiet_observe_record "$cmd" 0
 fi
 exit 0

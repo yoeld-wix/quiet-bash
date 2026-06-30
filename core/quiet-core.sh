@@ -32,6 +32,16 @@ QUIET_CORE_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)
 # Duplicate-read dedup helper (defines _quiet_mtime, quiet_dedup_check).
 [ -r "$QUIET_CORE_DIR/quiet-dedup.sh" ] && . "$QUIET_CORE_DIR/quiet-dedup.sh"
 
+# Stage-1 observe-only ledger (config-flag gated, default off; defines
+# quiet_observe_record / quiet_observe_report / quiet_observe_fingerprint).
+[ -r "$QUIET_CORE_DIR/quiet-observe.sh" ] && . "$QUIET_CORE_DIR/quiet-observe.sh"
+
+# Stage-3 mechanical reuse (config-flag gated, default off; defines
+# quiet_reuse_rewrite / quiet_reuse_eligible / quiet_reuse_enabled). Depends on
+# helpers from quiet-dedup (_quiet_mtime) and quiet-observe (canon/hash), so it
+# is sourced after both.
+[ -r "$QUIET_CORE_DIR/quiet-reuse.sh" ] && . "$QUIET_CORE_DIR/quiet-reuse.sh"
+
 # ── Prune stale redirect logs ────────────────────────────────────────────────
 quiet_prune() {
   # Throttle: a full dir scan on every hook invocation costs ~40ms. Skip it if we
@@ -82,6 +92,11 @@ quiet_run() {
   else
     echo "[FAILED: exit ${st} — ${ln} lines in ${log} | last ${QUIET_FAIL_TAIL_LINES} below; grep that file for the rest]"
     "$QUIET_CORE_DIR/quiet-tail.sh" "$log" "${QUIET_FAIL_TAIL_LINES}" 2>/dev/null || tail -n "${QUIET_FAIL_TAIL_LINES}" "$log"
+  fi
+  # Stage-1 observe: shell-wrapper/shim path runs the command here, so we have
+  # the REAL output byte count. No-op unless observe is enabled.
+  if command -v quiet_observe_record >/dev/null 2>&1; then
+    quiet_observe_record "$*" 1 "$(wc -c <"$log" 2>/dev/null | tr -d ' ')"
   fi
   return "$st"
 }

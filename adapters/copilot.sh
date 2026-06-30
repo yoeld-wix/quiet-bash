@@ -29,8 +29,11 @@ cmd=$(printf '%s' "$input" | jq -r '
   // ( .toolArgs | if type=="string" then (try fromjson catch null) else . end | .command? )
   // empty')
 
-if rewritten=$(quiet_rewrite "$cmd"); then
+if rewritten=$(quiet_reuse_rewrite "$cmd") || rewritten=$(quiet_rewrite "$cmd"); then
+  quiet_observe_record "$cmd" 1
   jq -n --arg c "$rewritten" \
     '{permissionDecision: "allow", modifiedArgs: {command: $c}}'
+else
+  quiet_observe_record "$cmd" 0
 fi
 exit 0

@@ -5,3 +5,7 @@ bench/agentic*-report.md
 
 # superpowers scratch (specs/plans are committed under docs/; ledger+research are scratch)
 .superpowers/
+
+# stage-1 observe-only: local per-repo ledger + per-user config toggle
+.quiet-cache/
+.quiet-bash.conf

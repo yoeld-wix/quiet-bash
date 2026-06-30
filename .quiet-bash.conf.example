@@ -1,0 +1,32 @@
+# quiet-bash config — copy to `.quiet-bash.conf` (repo-local) or
+# `$XDG_CONFIG_HOME/quiet-bash/config` (per-user) to activate.
+#
+# Stage-1 "observe-only" of the learning loop (docs/research/learning-loop.md).
+# When on, quiet-bash records a normalized fingerprint + a cheap cost proxy for
+# every Bash command to a local append-only JSONL ledger
+# (.quiet-cache/observe.jsonl by default). It NEVER rewrites commands or touches
+# the transcript — pure measurement. Off by default; fully local; bash + jq only.
+#
+# Inspect what recurs:  source core/quiet-observe.sh && quiet_observe_report
+observe = off
+
+# Stage-3 "mechanical reuse": when a deterministic, read-only command recurs
+# with UNCHANGED input files, serve its byte-exact cached result instead of
+# re-running. Off by default; behavior-changing, so opt in deliberately.
+#
+# Eligible only if ALL hold: a single simple command (no pipes/redirects/;/&&/
+# substitutions), the program is not on the denylist (no mutation/network/clock/
+# build/test/package/infra), and it references >=1 existing regular-file input.
+# Freshness is tiered (mtime+size, then content-hash). Any changed input re-runs.
+# Cache lives in .quiet-cache/reuse/ (byte-exact, recoverable). Tune the denylist
+# with the QUIET_REUSE_DENY env var.
+#
+# Disk / memory controls (env vars; defaults shown). Eviction runs opportunistically
+# (throttled) and via `quiet-reuse gc`:
+#   QUIET_REUSE_MAX_ENTRIES=500        # LRU-evict oldest beyond this many entries
+#   QUIET_REUSE_TTL_MINUTES=20160      # evict entries older than this (14 days)
+#   QUIET_REUSE_MAX_OUTPUT_BYTES=1048576  # never cache a result larger than 1 MB
+#   QUIET_LEDGER_MAX_BYTES=5242880     # trim observe/reuse JSONL ledgers past 5 MB
+#   QUIET_LEDGER_KEEP_LINES=2000       # ...keeping the most recent N rows
+# Inspect:  source core/quiet-reuse.sh; quiet-reuse status   (entries + bytes)
+reuse = off
