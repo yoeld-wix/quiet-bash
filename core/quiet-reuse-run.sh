@@ -21,8 +21,31 @@ out="$dir/$key.out"
 
 case "$mode" in
   serve)
+    canon=$(_quiet_reuse_canon_of "$key")
     touch "$out" 2>/dev/null || true   # mark recently-used so LRU eviction is accurate
-    quiet_reuse_log_event "$key" "$(_quiet_reuse_canon_of "$key")" hit "$(_quiet_size "$out")" 2>/dev/null || true
+    # Shadow-verify every Nth hit: re-run the command and compare to the cached
+    # result. Catches drift that input-freshness can't (untracked deps). On a
+    # mismatch, RETIRE the entry and serve the FRESH output — fail safe.
+    every="${QUIET_REUSE_VERIFY_EVERY:-50}"
+    hitsf="$dir/$key.hits"
+    n=$(cat "$hitsf" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" >"$hitsf" 2>/dev/null
+    if [ "${every:-0}" -gt 0 ] 2>/dev/null && [ $((n % every)) -eq 0 ]; then
+      vcmd=$(_quiet_reuse_cmd_of "$key")
+      sh -c "$vcmd" >"$out.verify" 2>&1; vst=$?
+      if cmp -s "$out.verify" "$out"; then
+        rm -f "$out.verify" 2>/dev/null
+        quiet_reuse_log_event "$key" "$canon" verify "$(_quiet_size "$out")" 2>/dev/null || true
+        printf '[quiet-bash] reuse: cached result re-verified (still matches)\n' >&2
+        cat -- "$out"; exit "$(quiet_reuse_status_of "$key")"
+      else
+        quiet_reuse_log_event "$key" "$canon" drift "$(_quiet_size "$out.verify")" 2>/dev/null || true
+        printf '[quiet-bash] reuse: DRIFT — cached result no longer matches; retiring entry, serving fresh output\n' >&2
+        cat -- "$out.verify"
+        rm -f "$out" "$dir/$key.meta" "$hitsf" "$out.verify" 2>/dev/null   # retire (fail safe)
+        exit "$vst"
+      fi
+    fi
+    quiet_reuse_log_event "$key" "$canon" hit "$(_quiet_size "$out")" 2>/dev/null || true
     printf '[quiet-bash] reuse: served cached result (inputs unchanged; full output follows)\n' >&2
     cat -- "$out"
     exit "$(quiet_reuse_status_of "$key")"

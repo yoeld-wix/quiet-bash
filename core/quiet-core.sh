@@ -42,6 +42,10 @@ QUIET_CORE_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)
 # is sourced after both.
 [ -r "$QUIET_CORE_DIR/quiet-reuse.sh" ] && . "$QUIET_CORE_DIR/quiet-reuse.sh"
 
+# Stage-4 crystallization (manual CLI; defines quiet_crystallize_suggest).
+# Reads the observe ledger, so it is sourced after quiet-observe.
+[ -r "$QUIET_CORE_DIR/quiet-crystallize.sh" ] && . "$QUIET_CORE_DIR/quiet-crystallize.sh"
+
 # ── Prune stale redirect logs ────────────────────────────────────────────────
 quiet_prune() {
   # Throttle: a full dir scan on every hook invocation costs ~40ms. Skip it if we

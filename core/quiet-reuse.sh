@@ -131,6 +131,7 @@ quiet_reuse_store() {
   meta="$(_quiet_reuse_dir)/$key.meta"
   { printf '#status %s\n' "$status"
     printf '#canon %s\n' "$(quiet_observe_canon "$cmd")"
+    printf '#cmd %s\n' "$cmd"
     _quiet_reuse_inputs "$cmd" | while IFS= read -r f; do
       printf '%s\t%s\t%s\t%s\n' "$f" "$(_quiet_mtime "$f")" "$(_quiet_size "$f")" "$(_quiet_reuse_hash_file "$f")"
     done
@@ -142,6 +143,7 @@ quiet_reuse_status_of() {
   printf '%s' "${s:-0}"
 }
 _quiet_reuse_canon_of() { sed -n 's/^#canon //p' "$(_quiet_reuse_dir)/$1.meta" 2>/dev/null | head -1; }
+_quiet_reuse_cmd_of() { sed -n 's/^#cmd //p' "$(_quiet_reuse_dir)/$1.meta" 2>/dev/null | head -1; }
 
 # ── Feedback / reputation: every reuse decision is a logged event ────────────
 # hit  = a cached result was served (bytes = result size that was NOT re-spent)
@@ -176,12 +178,13 @@ quiet_reuse_report() {
     | map({canon:.[0].canon,
            hits:(map(select(.event=="hit"))|length),
            miss:(map(select(.event=="miss"))|length),
+           drift:(map(select(.event=="drift"))|length),
            saved:([.[]|select(.event=="hit")|.bytes]|add // 0)})
     | sort_by(-.saved, -.hits)' "$f" 2>/dev/null \
-    | jq -r '.[] | "\(.hits)\t\(.miss)\t\(.saved)\t\(.canon)"' 2>/dev/null \
+    | jq -r '.[] | "\(.hits)\t\(.miss)\t\(.drift)\t\(.saved)\t\(.canon)"' 2>/dev/null \
     | awk -F'\t' '
-        BEGIN{ printf "%5s %5s %11s  %s\n","hits","miss","saved-B","pattern" }
-        { printf "%5d %5d %11d  %s\n",$1,$2,$3,$4 }'
+        BEGIN{ printf "%5s %5s %6s %11s  %s\n","hits","miss","drift","saved-B","pattern" }
+        { printf "%5d %5d %6d %11d  %s\n",$1,$2,$3,$4,$5 }'
 }
 
 quiet_reuse_status() {

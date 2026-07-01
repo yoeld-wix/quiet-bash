@@ -1089,5 +1089,88 @@ ll=$(wc -l < "$QUIET_OBSERVE_LEDGER" | tr -d ' ')
 unset QUIET_REUSE_DIR QUIET_REUSE_EVENTS QUIET_CONFIG_FILE QUIET_OBSERVE_LEDGER QUIET_LEDGER_MAX_BYTES QUIET_LEDGER_KEEP_LINES QUIET_REUSE_MAX_ENTRIES QUIET_REUSE_TTL_MINUTES
 rm -rf "$rtmp"
 
+echo "== crystallize (stage 4): suggest skill + bundled script =="
+rtmp=$(mktemp -d)
+export QUIET_OBSERVE_LEDGER="$rtmp/observe.jsonl"
+export QUIET_SUGGEST_DIR="$rtmp/suggestions"
+export QUIET_CONFIG_FILE="$rtmp/config"; printf 'observe = on\n' > "$QUIET_CONFIG_FILE"
+i=0; while [ "$i" -lt 3 ]; do quiet_observe_record 'wc -l data.txt' 1 100; i=$((i+1)); done
+quiet_observe_record 'jq . x.json' 1 50
+# stubbed synthesizer (deterministic stand-in for `claude -p`): consumes the prompt, emits a SKILL.md
+synth="$rtmp/fakesynth.sh"
+cat > "$synth" <<'S'
+#!/usr/bin/env bash
+cat >/dev/null
+cat <<'MD'
+---
+name: counting-lines
+description: Counts lines in a file. Use when counting lines or checking file length.
+---
+Run scripts/run.sh for the deterministic part.
+MD
+S
+chmod +x "$synth"
+export QUIET_SYNTH_CMD="$synth"
+quiet_crystallize_suggest 1 >/dev/null 2>&1
+sk=$(ls "$QUIET_SUGGEST_DIR"/*/SKILL.md 2>/dev/null | head -1)
+[ -n "$sk" ] && pass "crystallize: SKILL.md written" || bad "no SKILL.md produced"
+grep -q 'name: counting-lines' "$sk" 2>/dev/null && pass "crystallize: uses synthesized skill body" || bad "skill body wrong: $(cat "$sk" 2>/dev/null)"
+echo "$sk" | grep -qi 'wc' && pass "crystallize: picks the TOP recurring pattern (wc, not jq)" || bad "picked wrong pattern: $sk"
+scr="$(dirname "$sk")/scripts/run.sh"
+{ [ -x "$scr" ] && grep -q 'wc -l data.txt' "$scr"; } && pass "crystallize: bundled script runs the recurring command" || bad "script wrong: $(cat "$scr" 2>/dev/null)"
+# graceful mechanical fallback when the synthesizer is unavailable
+export QUIET_SYNTH_CMD="/nonexistent/synth-xyz"; rm -rf "$QUIET_SUGGEST_DIR"
+quiet_crystallize_suggest 1 >/dev/null 2>&1
+sk2=$(ls "$QUIET_SUGGEST_DIR"/*/SKILL.md 2>/dev/null | head -1)
+{ [ -n "$sk2" ] && grep -q '^name:' "$sk2"; } && pass "crystallize: mechanical fallback when synth missing" || bad "no fallback skill"
+# no ledger → graceful message, no crash
+export QUIET_OBSERVE_LEDGER="$rtmp/none.jsonl"
+quiet_crystallize_suggest 1 2>&1 | grep -qi 'no observe ledger' && pass "crystallize: graceful without a ledger" || bad "no-ledger not handled"
+# CLI entry
+export QUIET_OBSERVE_LEDGER="$rtmp/observe.jsonl"
+bash "$ROOT/core/quiet-crystallize.sh" suggest 1 >/dev/null 2>&1 && pass "CLI: quiet-crystallize runs" || bad "CLI crystallize failed"
+unset QUIET_OBSERVE_LEDGER QUIET_SUGGEST_DIR QUIET_CONFIG_FILE QUIET_SYNTH_CMD
+rm -rf "$rtmp"
+
+echo "== reuse (stage 5): shadow-verify + drift retirement =="
+rtmp=$(mktemp -d); mkdir -p "$rtmp/w"; printf 'NEW\n' > "$rtmp/w/f.txt"
+export QUIET_REUSE_DIR="$rtmp/reuse" QUIET_REUSE_EVENTS="$rtmp/ev.jsonl"
+export QUIET_CONFIG_FILE="$rtmp/config"; printf 'reuse = on\n' > "$QUIET_CONFIG_FILE"
+mkdir -p "$QUIET_REUSE_DIR"
+# forge a STALE entry: .out says OLD, but meta records the CURRENT (NEW) input sig,
+# so plain freshness passes — only a shadow re-run can catch this drift.
+( cd "$rtmp/w" && k=$(_quiet_reuse_key 'cat f.txt'); printf 'OLD\n' > "$QUIET_REUSE_DIR/$k.out"; quiet_reuse_store "$k" 'cat f.txt' 0 )
+out=$( cd "$rtmp/w" && QUIET_REUSE_VERIFY_EVERY=1 eval "$(quiet_reuse_rewrite 'cat f.txt')" 2>/dev/null )
+echo "$out" | grep -q NEW && pass "drift: serves FRESH output on mismatch" || bad "drift served: '$out'"
+k=$( cd "$rtmp/w" && _quiet_reuse_key 'cat f.txt' )
+[ ! -f "$QUIET_REUSE_DIR/$k.out" ] && pass "drift: stale entry retired (evicted)" || bad "entry not retired"
+[ "$(jq -s '[.[]|select(.event=="drift")]|length' "$QUIET_REUSE_EVENTS" 2>/dev/null)" = "1" ] && pass "drift: event logged" || bad "no drift event"
+# verify-ok: a matching re-run keeps the entry
+( cd "$rtmp/w" && eval "$(quiet_reuse_rewrite 'cat f.txt')" >/dev/null 2>&1 )   # miss → cache NEW
+out2=$( cd "$rtmp/w" && QUIET_REUSE_VERIFY_EVERY=1 eval "$(quiet_reuse_rewrite 'cat f.txt')" 2>/dev/null )
+echo "$out2" | grep -q NEW && pass "verify-ok: matching re-run still serves" || bad "verify-ok out: '$out2'"
+k=$( cd "$rtmp/w" && _quiet_reuse_key 'cat f.txt' )
+[ -f "$QUIET_REUSE_DIR/$k.out" ] && pass "verify-ok: entry retained" || bad "entry wrongly evicted"
+unset QUIET_REUSE_DIR QUIET_REUSE_EVENTS QUIET_CONFIG_FILE
+rm -rf "$rtmp"
+
+echo "== crystallize (stage 5): skill verify (result / cost / time) =="
+rtmp=$(mktemp -d); mkdir -p "$rtmp/sk/scripts"; seq 1 7 > "$rtmp/data.txt"
+cat > "$rtmp/sk/scripts/run.sh" <<'S'
+#!/usr/bin/env bash
+set -euo pipefail
+wc -l data.txt
+S
+chmod +x "$rtmp/sk/scripts/run.sh"
+v=$( cd "$rtmp" && quiet_crystallize_verify sk 2>&1 )
+echo "$v" | grep -q 'verdict:.*PASS' && pass "skill verify: PASS on a working skill" || bad "verify: $v"
+echo "$v" | grep -qi 'matches baseline' && pass "skill verify: differential matches baseline (result correct)" || bad "no baseline match: $v"
+echo "$v" | grep -qE 'time:[[:space:]]+[0-9]+ ms' && pass "skill verify: reports time (ms)" || bad "no time: $v"
+echo "$v" | grep -qE 'result:[[:space:]]+[0-9]+ bytes' && pass "skill verify: reports cost (bytes)" || bad "no bytes: $v"
+rm "$rtmp/data.txt"
+vf=$( cd "$rtmp" && quiet_crystallize_verify sk 2>&1 )
+echo "$vf" | grep -q 'verdict:.*FAIL' && pass "skill verify: FAIL when the script errors" || bad "should FAIL: $vf"
+rm -rf "$rtmp"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
