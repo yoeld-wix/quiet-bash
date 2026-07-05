@@ -134,6 +134,24 @@ echo "$sout" | grep -q 'more of 3000' && pass "summary states total count" || ba
 echo "$sout" | grep -q 'quiet-json.sh' >/dev/null; echo "$sout" | grep -q 'jq ' && pass "summary has jq drill-in footer" || bad "summary missing footer"
 rm -rf "$JTMP"
 
+echo "== JSON auto-stats (opt-in, QUIET_JSON_AUTOSTATS=1) =="
+ATMP=$(mktemp -d)
+recs="$ATMP/records.json"
+jq -n '[range(20)|{id:., status:(if .%2==0 then "open" else "closed" end), price:(10+.)}]' > "$recs"
+default_out=$("$ROOT/core/quiet-json.sh" "$recs")
+echo "$default_out" | grep -q 'Auto-computed field stats' && bad "autostats ran without opt-in" || pass "autostats off by default"
+stats_out=$(QUIET_JSON_AUTOSTATS=1 "$ROOT/core/quiet-json.sh" "$recs")
+echo "$stats_out" | grep -q 'Auto-computed field stats' && pass "autostats section present when opted in" || bad "autostats section missing"
+echo "$stats_out" | grep -q '"record_count": 20' && pass "autostats record_count correct" || bad "autostats record_count wrong"
+echo "$stats_out" | grep -q '"min": 10' && echo "$stats_out" | grep -q '"max": 29' && pass "autostats numeric min/max correct" || bad "autostats numeric stats wrong"
+echo "$stats_out" | grep -q '"distinct": 2' && pass "autostats string distinct-count correct" || bad "autostats string stats wrong"
+# below the item-count floor -> no stats section even when opted in
+tiny="$ATMP/tiny.json"
+jq -n '[range(3)|{id:.}]' > "$tiny"
+tiny_out=$(QUIET_JSON_AUTOSTATS=1 QUIET_JSON_STATS_MIN_ITEMS=10 "$ROOT/core/quiet-json.sh" "$tiny")
+echo "$tiny_out" | grep -q 'Auto-computed field stats' && bad "autostats ran below min-items floor" || pass "autostats respects min-items floor"
+rm -rf "$ATMP"
+
 echo "== YAML read optimization =="
 if command -v ruby >/dev/null 2>&1 || command -v yq >/dev/null 2>&1 \
    || { command -v python3 >/dev/null 2>&1 && python3 -c 'import yaml' 2>/dev/null; }; then

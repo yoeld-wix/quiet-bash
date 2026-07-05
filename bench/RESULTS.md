@@ -201,4 +201,55 @@ proxy design cannot do on its own.
 
 Caveats: n=3 (+1 pilot at n=1), one task shape (single tool discovery + call),
 one model (Haiku). Directional, not definitive — but the sign was consistent
-across every rep. Reproduce: `bench/mcp-schema-deferral.sh`. Run: 2026-07-05.
+across every rep. Run: 2026-07-05. (The prototype proxy and this benchmark
+script were removed after the negative verdict above — this section is the
+kept record; see `docs/research/cost-levers-2026-07-update.md` candidate #1.)
+
+## JSON auto-stats prototype — live A/B (verdict: promising, kept opt-in)
+
+Follow-up to `docs/research/cost-levers-2026-07-update.md` candidate #2
+(sandbox-computed result reduction). Unlike candidate #1 above, this one
+doesn't add a round trip — it tries to *save* one. `core/quiet-json.sh` gained
+an opt-in flag, `QUIET_JSON_AUTOSTATS=1`: when the root of a large JSON read is
+an array of uniform records, it computes per-field stats (count/min/max/avg
+for numbers, distinct-count + top values for low-cardinality strings) over
+**every** record — not just the 3-item folded sample — and attaches them to
+the existing collapsed preview. Off by default; adds ~1.2 KB to the preview on
+a 5,000-record fixture (1,539 → 2,740 bytes).
+
+**Live A/B** (`bench/json-autostats.sh`, `claude-haiku-4-5`, a 5,000-record
+JSON array, task: "how many orders are open, and what's the average price" —
+an aggregate question the 3-item sample can't answer on its own). First pass
+(no cache warmup) showed a large but confounded swing, because both arms share
+an identical prompt prefix (same task, same tools) up to the point the tool
+result diverges, so whichever arm runs first eats a one-off cold-cache
+`cache_creation` tax unrelated to the feature. Re-run with a throwaway warmup
+call first to share a pre-warmed cache, n=4:
+
+```
+| arm                                  | cost $ | cache-read | turns | correct | runs |
+|----------------------------------------|-------:|-----------:|------:|--------:|-----:|
+| A baseline (no autostats)              | 0.0276 |     99,035 |   3.8 |     2/4 |   4  |
+| B autostats (QUIET_JSON_AUTOSTATS=1)   | 0.0268 |     91,976 |   3.5 |     4/4 |   4  |
+
+autostats vs baseline: cost +3.0% (i.e. roughly a wash)
+```
+
+**Cost is a wash — but correctness isn't.** Per-rep detail: baseline answered
+`1667 255.18` (correct) twice, but `1667 262.19` and `1667 255.23` (both
+wrong on the average-price component) the other two times — it sometimes
+skipped querying the full file and estimated from the sample, or queried
+incorrectly. Autostats answered exactly right all 4 times, because the exact
+number is simply present in the tool output instead of requiring the model to
+recognize it needs to query further, choose the right query, and get it right.
+Turn count trended lower for autostats (3.5 vs 3.8) but wasn't a clean win by
+itself — the real, consistent effect was the accuracy gap.
+
+**Verdict: keep, opt-in, not yet a default-flip candidate.** This isn't a
+token-cost lever in the way candidate #1 was tested to be — it's closer to a
+*correctness* lever that happens to cost about the same. That's a different,
+harder-to-benchmark kind of win (a silently wrong answer is worse than an
+extra query call, but doesn't show up as a cost or turn-count number). n=4 is
+too small to trust the exact 2/4-vs-4/4 split as a stable rate — it should be
+read as "the failure mode is real and reproducible," not "50% of baseline
+answers are wrong." Reproduce: `bench/json-autostats.sh`. Run: 2026-07-05.

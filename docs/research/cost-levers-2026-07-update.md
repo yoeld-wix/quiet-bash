@@ -87,6 +87,25 @@ Sources: <https://www.anthropic.com/engineering/advanced-tool-use>,
 a more dramatic "150,000→2,000 tokens, 98.7%" figure for MCP progressive
 disclosure was explicitly **refuted** on reverification — don't cite it).
 
+> **Measured (2026-07-05), verdict: promising, keep as opt-in — not a clear
+> cost win but a real correctness win.** Prototyped the narrowest tractable
+> shape: `core/quiet-json.sh` now supports `QUIET_JSON_AUTOSTATS=1`, which
+> auto-computes per-field stats (count/min/max/avg for numbers, distinct+top
+> values for low-cardinality strings) over a **full** root-level record array
+> and attaches them to the existing collapsed preview — mechanical, jq-only,
+> no LLM call, off by default. Live A/B (`bench/json-autostats.sh`,
+> 5,000-record fixture, an aggregate-answer task, cache pre-warmed to remove
+> cold-start noise, n=4): **cost was a wash (+3%)**, but **correctness was
+> not** — baseline got the exact answer only **2/4** times (guessed/estimated
+> a wrong average price twice), autostats got it right **4/4** times, every
+> time, because the exact number is just handed to the model instead of
+> requiring it to notice it needs to query further and do so correctly. Full
+> write-up: `bench/RESULTS.md` § "JSON auto-stats." n=4 is small — directional,
+> not definitive — but the failure mode it fixes (silently wrong aggregate
+> answers from a sampled preview) is a real regression risk in the *existing*
+> shipped preview, not a novel risk added by this feature. Kept opt-in
+> pending a larger benchmark before considering a default flip.
+
 ### 3. Cross-file, budget-constrained relevance ranking (Aider repo-map style) — still unbuilt
 
 `docs/token-reduction-research.md` already cites Aider's tree-sitter+PageRank
