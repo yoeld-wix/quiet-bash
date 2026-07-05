@@ -35,6 +35,24 @@ generic)
   exit "$st"
   ;;
 
+git)
+  summary="${3:?usage: qr.sh git <cmd> <summary-cmd>}"
+  log=$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
+  bash -c "$cmd" >"$log" 2>&1
+  st=$?
+  ln=$(wc -l <"$log" | tr -d ' ')
+  if [ "$st" -ne 0 ]; then
+    echo "[git FAILED: exit ${st} — ${ln} lines in ${log} | last ${QUIET_FAIL_TAIL_LINES} below]"
+    "$QUIET_CORE_DIR/quiet-tail.sh" "$log" "${QUIET_FAIL_TAIL_LINES}" 2>/dev/null || tail -n "${QUIET_FAIL_TAIL_LINES}" "$log"
+  elif [ "$ln" -le "${QUIET_INLINE_LINE_LIMIT}" ]; then
+    cat "$log"
+  else
+    echo "[git output is ${ln} lines -> ${log} | summary below; locate: grep -n '<pattern>' ${log} | tally: quiet-agg.sh ${log} '<pattern>']"
+    bash -c "$summary" 2>/dev/null | head -n 200
+  fi
+  exit "$st"
+  ;;
+
 *)
   echo "qr: unknown mode '$mode'" >&2
   exit 2

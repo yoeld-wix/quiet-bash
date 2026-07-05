@@ -290,7 +290,7 @@ quiet_rewrite() {
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)diff/\1git\2diff --stat/' \
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)show/\1git\2show --stat/' \
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)log/\1git\2log --oneline/')
-    _quiet_wrap_git "$cmd" "$summary"
+    printf '%q %q %q %q' "${QUIET_CORE_DIR}/qr.sh" "git" "$cmd" "$summary"
     return 0
   fi
 

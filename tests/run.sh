@@ -923,5 +923,35 @@ qrun_fail=$(quiet_run sh -c 'echo x; exit 2' 2>/dev/null)
 { printf '%s' "$qrun_fail" | grep -qF 'more: ' && printf '%s' "$qrun_fail" | grep -qF 'quiet-tail.sh'; } \
   && pass "quiet_run: FAILED message uses new wording" || bad "quiet_run: FAILED message uses new wording"
 
+echo "== qr.sh: git mode =="
+r=$(quiet_rewrite "git diff")
+printf '%s' "$r" | grep -qF 'qr.sh git' && pass "git: quiet_rewrite routes to qr.sh git" || bad "git: quiet_rewrite routes to qr.sh git"
+printf '%s' "$r" | grep -qF 'mktemp' && bad "git: rewrite still inlines mktemp" || pass "git: rewrite has no inline mktemp"
+
+GD=$(mktemp -d)
+( cd "$GD" && git init -q && git config user.email t@t.com && git config user.name t \
+  && printf 'a\nb\nc\n' > f.txt && git add f.txt && git commit -qm init \
+  && for i in $(seq 1 100); do echo "line $i" >> f.txt; done \
+  && git add f.txt && git commit -qm bulk )
+out=$( cd "$GD" && "$ROOT/core/qr.sh" git 'git log --oneline' 'git log --oneline' )
+printf '%s' "$out" | grep -qF 'bulk' && pass "git: small output shown inline" || bad "git: small output shown inline"
+
+out=$( cd "$GD" && "$ROOT/core/qr.sh" git 'git show nonexistent-ref' 'git show --stat nonexistent-ref' )
+printf '%s' "$out" | grep -qF '[git FAILED: exit' && pass "git: failure message format" || bad "git: failure message format"
+( cd "$GD" && "$ROOT/core/qr.sh" git 'git show nonexistent-ref' 'git show --stat nonexistent-ref' >/dev/null 2>&1 ); [ $? -ne 0 ] && pass "git: exit code passthrough on failure" || bad "git: exit code passthrough on failure"
+rm -rf "$GD"
+
+GD2=$(mktemp -d)
+( cd "$GD2" && git init -q && git config user.email t@t.com && git config user.name t \
+  && printf 'orig\n' > f.txt && git add f.txt && git commit -qm init \
+  && for i in $(seq 1 100); do echo "line $i"; done > f.txt )
+out=$( cd "$GD2" && "$ROOT/core/qr.sh" git 'git diff' 'git diff --stat' )
+{ printf '%s' "$out" | grep -qF 'git output is' \
+  && printf '%s' "$out" | grep -qF 'locate: ' \
+  && printf '%s' "$out" | grep -qF 'tally: quiet-agg.sh'; } \
+  && pass "git: large output uses new locate/tally wording" || bad "git: large output uses new locate/tally wording"
+printf '%s' "$out" | grep -qF 'f.txt' && pass "git: large-output summary shows file stat" || bad "git: large-output summary shows file stat"
+rm -rf "$GD2"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
