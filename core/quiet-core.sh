@@ -78,9 +78,9 @@ quiet_run() {
   st=$?
   ln=$(wc -l <"$log" | tr -d ' ')
   if [ "$st" -eq 0 ]; then
-    echo "[ok: exit 0 — ${ln} lines hidden in ${log}; grep/tail it only if you need details]"
+    echo "[ok: exit 0 — ${ln} lines hidden in ${log}; more: ${QUIET_CORE_DIR}/quiet-tail.sh ${log} <n> | tally: quiet-agg.sh ${log} '<re>']"
   else
-    echo "[FAILED: exit ${st} — ${ln} lines in ${log} | last ${QUIET_FAIL_TAIL_LINES} below; grep that file for the rest]"
+    echo "[FAILED: exit ${st} — ${ln} lines in ${log} | last ${QUIET_FAIL_TAIL_LINES} below; more: ${QUIET_CORE_DIR}/quiet-tail.sh ${log} <n> | tally: quiet-agg.sh ${log} '<re>']"
     "$QUIET_CORE_DIR/quiet-tail.sh" "$log" "${QUIET_FAIL_TAIL_LINES}" 2>/dev/null || tail -n "${QUIET_FAIL_TAIL_LINES}" "$log"
   fi
   return "$st"
@@ -384,7 +384,7 @@ quiet_rewrite() {
   local verbose_re="${pre}(${always}|${managed})"
 
   if [[ $cmd =~ $verbose_re ]]; then
-    _quiet_wrap_generic "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "generic" "$cmd"
     return 0
   fi
 

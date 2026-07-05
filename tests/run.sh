@@ -885,5 +885,43 @@ for tok in 'quiet-patch' 'quiet-applies'; do
   grep -qF "$tok" "$SKF" 2>/dev/null && pass "skill mentions $tok" || bad "skill missing $tok"
 done
 
+echo "== qr.sh: generic mode =="
+QR="$ROOT/core/qr.sh"
+r=$(quiet_rewrite "npm install")
+printf '%s' "$r" | grep -qF 'qr.sh generic' && pass "generic: quiet_rewrite routes to qr.sh generic" || bad "generic: quiet_rewrite routes to qr.sh generic"
+printf '%s' "$r" | grep -qF 'mktemp' && bad "generic: rewrite still inlines mktemp" || pass "generic: rewrite has no inline mktemp"
+
+out=$("$QR" generic 'for i in $(seq 1 5); do echo "line $i"; done')
+{ printf '%s' "$out" | grep -qF '[ok: exit 0 — 5 lines hidden in ' \
+  && printf '%s' "$out" | grep -qF 'more: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-tail.sh' \
+  && printf '%s' "$out" | grep -qF "tally: quiet-agg.sh"; } \
+  && pass "generic: success message uses new wording" || bad "generic: success message uses new wording"
+
+out=$("$QR" generic '(echo "line 1"; echo "ERROR: boom"; exit 3)')
+{ printf '%s' "$out" | head -1 | grep -qF '[FAILED: exit 3 —' \
+  && printf '%s' "$out" | grep -qF 'more: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-tail.sh'; } \
+  && pass "generic: FAILED message uses new wording" || bad "generic: FAILED message uses new wording"
+printf '%s' "$out" | grep -qF 'ERROR: boom' && pass "generic: failure tail includes the error" || bad "generic: failure tail includes the error"
+"$QR" generic '(exit 3)' >/dev/null; [ $? -eq 3 ] && pass "generic: exit code passthrough" || bad "generic: exit code passthrough"
+
+GTD=$(mktemp -d)
+( cd "$GTD" \
+  && weird='make ; printf "%s\n" "it'"'"'s here"' \
+  && rw=$(quiet_rewrite "$weird") \
+  && out=$(bash -c "$rw" 2>&1) \
+  && logpath=$(printf '%s' "$out" | grep -oE "${QUIET_LOG_DIR%/}/+${QUIET_LOG_PREFIX}[A-Za-z0-9]+" | head -1) \
+  && [ -n "$logpath" ] && grep -qF "it's here" "$logpath" ) \
+  && pass "generic: %q escaping round-trips quotes through qr.sh" || bad "generic: %q escaping round-trips quotes through qr.sh"
+rm -rf "$GTD"
+
+qrun_out=$(quiet_run printf 'a\nb\n')
+{ printf '%s' "$qrun_out" | grep -qF 'more: ' && printf '%s' "$qrun_out" | grep -qF 'quiet-tail.sh'; } \
+  && pass "quiet_run: success message uses new wording" || bad "quiet_run: success message uses new wording"
+qrun_fail=$(quiet_run sh -c 'echo x; exit 2' 2>/dev/null)
+{ printf '%s' "$qrun_fail" | grep -qF 'more: ' && printf '%s' "$qrun_fail" | grep -qF 'quiet-tail.sh'; } \
+  && pass "quiet_run: FAILED message uses new wording" || bad "quiet_run: FAILED message uses new wording"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
