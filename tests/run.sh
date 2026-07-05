@@ -599,7 +599,7 @@ echo "== cache-safety: rendered output is deterministic (never busts the prompt-
   . "$ROOT/core/quiet-core.sh"
   # 1. command rewrites are byte-identical
   cs_ok=1
-  for c in "yarn test" "cargo build --release" "git diff" "grep -r foo ." "curl https://x"; do
+  for c in "yarn test" "cargo build --release" "git diff" "grep -r foo ." "curl https://x" "gh pr diff 1"; do
     [ "$(quiet_rewrite "$c")" = "$(quiet_rewrite "$c")" ] || cs_ok=0
   done
   [ "$cs_ok" = 1 ] && pass "quiet_rewrite renders identical output for identical command" || bad "quiet_rewrite is non-deterministic (cache risk)"
