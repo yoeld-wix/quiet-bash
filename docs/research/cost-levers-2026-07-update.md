@@ -87,24 +87,28 @@ Sources: <https://www.anthropic.com/engineering/advanced-tool-use>,
 a more dramatic "150,000→2,000 tokens, 98.7%" figure for MCP progressive
 disclosure was explicitly **refuted** on reverification — don't cite it).
 
-> **Measured (2026-07-05), verdict: promising, keep as opt-in — not a clear
-> cost win but a real correctness win.** Prototyped the narrowest tractable
-> shape: `core/quiet-json.sh` now supports `QUIET_JSON_AUTOSTATS=1`, which
+> **Measured (2026-07-05), verdict: no proven benefit at n=40 — corrects an
+> earlier same-day overclaim.** Prototyped the narrowest tractable shape:
+> `core/quiet-json.sh` now supports `QUIET_JSON_AUTOSTATS=1`, which
 > auto-computes per-field stats (count/min/max/avg for numbers, distinct+top
 > values for low-cardinality strings) over a **full** root-level record array
 > and attaches them to the existing collapsed preview — mechanical, jq-only,
-> no LLM call, off by default. Live A/B (`bench/json-autostats.sh`,
-> 5,000-record fixture, an aggregate-answer task, cache pre-warmed to remove
-> cold-start noise, n=4): **cost was a wash (+3%)**, but **correctness was
-> not** — baseline got the exact answer only **2/4** times (guessed/estimated
-> a wrong average price twice), autostats got it right **4/4** times, every
-> time, because the exact number is just handed to the model instead of
-> requiring it to notice it needs to query further and do so correctly. Full
-> write-up: `bench/RESULTS.md` § "JSON auto-stats." n=4 is small — directional,
-> not definitive — but the failure mode it fixes (silently wrong aggregate
-> answers from a sampled preview) is a real regression risk in the *existing*
-> shipped preview, not a novel risk added by this feature. Kept opt-in
-> pending a larger benchmark before considering a default flip.
+> no LLM call, off by default. A first pilot (`bench/json-autostats.sh`, n=4)
+> looked like a clean win (cost a wash, correctness 4/4 vs 2/4) — but n=4 is
+> below this project's own noise floor. A follow-up at n=40/arm with a proper
+> significance test (logistic regression, binomial/logit) found **no real
+> difference in correctness** (35/40 vs 36/40, p=0.72) **and cost directionally
+> worse** (+8.3%). Investigating the apparent "regression" surfaced that the
+> original n=4 result was itself a **grading-script bug** (checked only the
+> first token of the reply; the autostats arm had started prefacing correct
+> answers with "Based on the auto-computed stats..."), not a real effect —
+> full account in `bench/RESULTS.md` § "JSON auto-stats." **Kept opt-in, not
+> proven as either a cost or correctness lever.** Any further work on this
+> candidate (wrapped-array shapes, richer per-field stats) should be
+> benchmarked at n=40+ from the start — this is the second candidate in this
+> doc where a small-n pilot pointed the wrong way (see #1's cache-warmup
+> confound above), which is itself the load-bearing lesson: **benchmark size
+> discipline matters more here than any individual technique.**
 
 ### 3. Cross-file, budget-constrained relevance ranking (Aider repo-map style) — still unbuilt
 

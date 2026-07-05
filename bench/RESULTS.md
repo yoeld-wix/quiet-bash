@@ -205,7 +205,19 @@ across every rep. Run: 2026-07-05. (The prototype proxy and this benchmark
 script were removed after the negative verdict above — this section is the
 kept record; see `docs/research/cost-levers-2026-07-update.md` candidate #1.)
 
-## JSON auto-stats prototype — live A/B (verdict: promising, kept opt-in)
+## JSON auto-stats prototype — live A/B (verdict: no proven effect at n=80; corrected below)
+
+**Correction (2026-07-05, same day):** the "keep, correctness win" verdict
+originally written for this section was **wrong** — reached from n=4, which
+this project's own convention already flags as too small to trust (see the
+main benchmark's "even n=20 is noisy" caveat above). A follow-up n=40/arm run
+with a proper significance test found **no real effect**, and traced the
+original 4/4-vs-2/4 result to a **grading bug**, not a real difference. Kept
+both write-ups below — the original (labeled) and the correction — instead of
+overwriting history, because the mistake itself (small-n overclaim, silently
+wrong grading) is as useful a record as the finding would have been.
+
+### Original n=4 finding (superseded — see correction below)
 
 Follow-up to `docs/research/cost-levers-2026-07-update.md` candidate #2
 (sandbox-computed result reduction). Unlike candidate #1 above, this one
@@ -245,11 +257,45 @@ recognize it needs to query further, choose the right query, and get it right.
 Turn count trended lower for autostats (3.5 vs 3.8) but wasn't a clean win by
 itself — the real, consistent effect was the accuracy gap.
 
-**Verdict: keep, opt-in, not yet a default-flip candidate.** This isn't a
-token-cost lever in the way candidate #1 was tested to be — it's closer to a
-*correctness* lever that happens to cost about the same. That's a different,
-harder-to-benchmark kind of win (a silently wrong answer is worse than an
-extra query call, but doesn't show up as a cost or turn-count number). n=4 is
-too small to trust the exact 2/4-vs-4/4 split as a stable rate — it should be
-read as "the failure mode is real and reproducible," not "50% of baseline
-answers are wrong." Reproduce: `bench/json-autostats.sh`. Run: 2026-07-05.
+**Original (superseded) verdict:** keep, opt-in, correctness win. n=4 was too
+small to trust — see below.
+
+### Correction: n=40/arm, with a significance test
+
+Scaled the same benchmark to 40 reps/arm (80 live calls) and fit a logistic
+regression (GLM, binomial/logit link) on correctness ~ arm instead of eyeballing
+a ratio. First result looked like a reversal — autostats *worse* on
+correctness (31/40 vs baseline 35/40) and 8% *more* expensive. Investigating
+the "failures" surfaced the real bug: the grader checked only the first token
+of the reply, and the autostats arm had started prefacing its answer ("Based
+on the auto-computed stats... \n\n1667 255.18") — a **correct** answer the
+strict first-token grader marked wrong. Re-grading by the last non-empty line
+(the actual final answer) instead:
+
+```
+| arm                                  | cost $ | cache-read | turns | correct | runs |
+|----------------------------------------|-------:|-----------:|------:|--------:|-----:|
+| A baseline (no autostats)              | 0.0253 |     89,746 |   3.5 |    35/40 |  40 |
+| B autostats (QUIET_JSON_AUTOSTATS=1)   | 0.0274 |     99,642 |   3.8 |    36/40 |  40 |
+
+contingency: baseline 35/40, autostats 36/40
+GLM (logit): is_autostats coef +0.251 (se 0.712, z=0.35, p=0.72), odds ratio 1.29x
+Fisher's exact test: p=1
+cost: autostats +8.3% (i.e. more expensive, not cheaper)
+```
+
+**No significant difference in correctness (p=0.72), and cost is directionally
+worse, not better.** The n=4 pilot's 4/4-vs-2/4 gap was noise amplified by a
+grading bug, not a real accuracy effect. `bench/json-autostats.sh`'s grader is
+now fixed (grades the last line, not the first token) for any future run.
+
+**Verdict: no proven benefit at this scale — kept opt-in, not a candidate for
+default-on, and not proven as a "correctness lever" either.** This is a clean
+example of the same discipline the main benchmark above already learned the
+hard way (an earlier n=8 read overclaiming ~21%): **small-n results here are
+not just imprecise, they can point in the wrong direction entirely.** If this
+direction is worth pursuing further (e.g. broader shape coverage — wrapped
+arrays like `{"items":[...]}`, richer per-field stats), it should be
+re-benchmarked at this n=40+ scale from the start, not re-validated at n=4.
+Reproduce: `bench/json-autostats.sh`. Runs: 2026-07-05 (n=4), 2026-07-05 (n=40,
+corrected).
