@@ -69,6 +69,20 @@ content)
   exit "$st"
   ;;
 
+search)
+  log=$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
+  bash -c "$cmd" >"$log" 2>&1
+  st=$?
+  ln=$(wc -l <"$log" | tr -d ' ')
+  if [ "$ln" -le "${QUIET_INLINE_LINE_LIMIT}" ]; then
+    cat "$log"
+  else
+    echo "[${ln} lines -> ${log} | first ${QUIET_FAIL_TAIL_LINES} below; locate: grep -n '<pattern>' ${log} | tally: quiet-agg.sh ${log} '<pattern>']"
+    head -n "${QUIET_FAIL_TAIL_LINES}" "$log"
+  fi
+  exit "$st"
+  ;;
+
 *)
   echo "qr: unknown mode '$mode'" >&2
   exit 2

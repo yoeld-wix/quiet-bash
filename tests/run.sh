@@ -972,5 +972,22 @@ out=$("$ROOT/core/qr.sh" content 'for i in $(seq 1 100); do echo "line $i"; done
   && pass "content: head+tail both present" || bad "content: head+tail both present"
 printf '%s' "$out" | grep -qF '— grep it' && bad "content: ellipsis still has old trailing hint" || pass "content: ellipsis has no old trailing hint"
 
+echo "== qr.sh: search mode =="
+r=$(quiet_rewrite "ls -R /tmp")
+printf '%s' "$r" | grep -qF 'qr.sh search' && pass "search: ls -R routes to qr.sh search" || bad "search: ls -R routes to qr.sh search"
+r2=$(quiet_rewrite "grep -r foo .")
+printf '%s' "$r2" | grep -qF 'qr.sh search' && pass "search: grep -r routes to qr.sh search" || bad "search: grep -r routes to qr.sh search"
+r3=$(quiet_rewrite "npm ls")
+printf '%s' "$r3" | grep -qF 'qr.sh search' && pass "search: npm ls routes to qr.sh search" || bad "search: npm ls routes to qr.sh search"
+
+out=$("$ROOT/core/qr.sh" search 'echo one; echo two')
+{ printf '%s' "$out" | grep -qF 'one' && printf '%s' "$out" | grep -qF 'two'; } && pass "search: small output shown inline" || bad "search: small output shown inline"
+
+out=$("$ROOT/core/qr.sh" search 'for i in $(seq 1 100); do echo "file_$i.txt"; done')
+{ printf '%s' "$out" | grep -qF 'lines ->' \
+  && printf '%s' "$out" | grep -qF 'locate: grep -n' \
+  && printf '%s' "$out" | grep -qF 'tally: quiet-agg.sh'; } \
+  && pass "search: large output uses new wording" || bad "search: large output uses new wording"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

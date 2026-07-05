@@ -318,7 +318,7 @@ quiet_rewrite() {
   local find_re='(^|[[:space:];&|(])find[[:space:]]+[^-]'
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* && $cmd != *-exec* ]] \
      && { [[ $cmd =~ $lsr_re ]] || [[ $cmd =~ $tree_re ]] || [[ $cmd =~ $find_re ]]; }; then
-    _quiet_wrap_search "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "search" "$cmd"
     return 0
   fi
 
@@ -335,7 +335,7 @@ quiet_rewrite() {
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* && $cmd != *-exec* ]] \
      && { { [[ $cmd =~ $grep_re ]] && [[ $cmd =~ $recflag_re ]]; } || [[ $cmd =~ $rg_re ]]; } \
      && ! [[ $cmd =~ $sbound_re ]]; then
-    _quiet_wrap_search "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "search" "$cmd"
     return 0
   fi
 
@@ -361,7 +361,7 @@ quiet_rewrite() {
   local logdump_re='(^|[[:space:];&|(])(kubectl[[:space:]]+logs|docker[[:space:]]+logs|journalctl|dmesg)([[:space:]]|$)'
   local help_re='(^|[[:space:]])(-h|--help|--version|version)([[:space:]]|$)'
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* ]] && ! [[ $cmd =~ $help_re ]]; then
-    if [[ $cmd =~ $listing_re ]]; then _quiet_wrap_search  "$cmd"; return 0; fi
+    if [[ $cmd =~ $listing_re ]]; then printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "search" "$cmd"; return 0; fi
     if [[ $cmd =~ $logdump_re ]]; then printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "content" "$cmd"; return 0; fi
   fi
 
