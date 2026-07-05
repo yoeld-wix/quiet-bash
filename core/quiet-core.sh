@@ -304,7 +304,7 @@ quiet_rewrite() {
   local ghlogflag_re='(^|[[:space:]])--log(-failed)?([[:space:]]|$)'   # bounded: not --log-url/--logout
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* ]] \
      && { { [[ $cmd =~ $ghrun_re ]] && [[ $cmd =~ $ghlogflag_re ]]; } || [[ $cmd =~ $ghdiff_re ]]; }; then
-    _quiet_wrap_content "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "content" "$cmd"
     return 0
   fi
 
@@ -362,7 +362,7 @@ quiet_rewrite() {
   local help_re='(^|[[:space:]])(-h|--help|--version|version)([[:space:]]|$)'
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* ]] && ! [[ $cmd =~ $help_re ]]; then
     if [[ $cmd =~ $listing_re ]]; then _quiet_wrap_search  "$cmd"; return 0; fi
-    if [[ $cmd =~ $logdump_re ]]; then _quiet_wrap_content "$cmd"; return 0; fi
+    if [[ $cmd =~ $logdump_re ]]; then printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "content" "$cmd"; return 0; fi
   fi
 
   # ── verbose-runner path: build/test/install/CI tooling across ecosystems ──

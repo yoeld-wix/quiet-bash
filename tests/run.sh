@@ -953,5 +953,24 @@ out=$( cd "$GD2" && "$ROOT/core/qr.sh" git 'git diff' 'git diff --stat' )
 printf '%s' "$out" | grep -qF 'f.txt' && pass "git: large-output summary shows file stat" || bad "git: large-output summary shows file stat"
 rm -rf "$GD2"
 
+echo "== qr.sh: content mode =="
+r=$(quiet_rewrite "gh pr diff 45")
+printf '%s' "$r" | grep -qF 'qr.sh content' && pass "content: gh pr diff routes to qr.sh content" || bad "content: gh pr diff routes to qr.sh content"
+r2=$(quiet_rewrite "kubectl logs mypod")
+printf '%s' "$r2" | grep -qF 'qr.sh content' && pass "content: kubectl logs routes to qr.sh content" || bad "content: kubectl logs routes to qr.sh content"
+
+out=$("$ROOT/core/qr.sh" content 'echo hello')
+[ "$out" = "hello" ] && pass "content: small output shown inline" || bad "content: small output shown inline"
+
+out=$("$ROOT/core/qr.sh" content 'for i in $(seq 1 100); do echo "line $i"; done')
+{ printf '%s' "$out" | grep -qF 'head+tail below' \
+  && printf '%s' "$out" | grep -qF 'more: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-tail.sh' \
+  && printf '%s' "$out" | grep -qF 'locate: grep -n'; } \
+  && pass "content: large output uses new wording" || bad "content: large output uses new wording"
+{ printf '%s' "$out" | grep -qF 'line 1' && printf '%s' "$out" | grep -qF 'line 100'; } \
+  && pass "content: head+tail both present" || bad "content: head+tail both present"
+printf '%s' "$out" | grep -qF '— grep it' && bad "content: ellipsis still has old trailing hint" || pass "content: ellipsis has no old trailing hint"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

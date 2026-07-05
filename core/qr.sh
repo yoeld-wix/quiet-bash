@@ -53,6 +53,22 @@ git)
   exit "$st"
   ;;
 
+content)
+  log=$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
+  bash -c "$cmd" >"$log" 2>&1
+  st=$?
+  ln=$(wc -l <"$log" | tr -d ' ')
+  if [ "$ln" -le "${QUIET_INLINE_LINE_LIMIT}" ]; then
+    cat "$log"
+  else
+    echo "[output is ${ln} lines -> ${log} | head+tail below; more: ${QUIET_CORE_DIR}/quiet-tail.sh ${log} <n> | locate: grep -n '<pattern>' ${log}]"
+    head -n 15 "$log"
+    echo "   ⋮ ($((ln - 40)) more lines in ${log})"
+    "$QUIET_CORE_DIR/quiet-tail.sh" "$log" 25 2>/dev/null || tail -n 25 "$log"
+  fi
+  exit "$st"
+  ;;
+
 *)
   echo "qr: unknown mode '$mode'" >&2
   exit 2
