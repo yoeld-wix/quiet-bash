@@ -5,6 +5,20 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+- **`quiet_rewrite` now returns a one-line call to `core/qr.sh <mode> <cmd>` instead of an
+  inline multi-line heredoc.** The mktemp/redirect/summarize logic that used to live in
+  `_quiet_wrap_generic`/`_quiet_wrap_git`/`_quiet_wrap_content`/`_quiet_wrap_search`/
+  `_quiet_wrap_curl` (generated as text, substituted into the returned command) now lives
+  in `qr.sh` as real code, run via a short dispatcher call. Whatever an adapter's UI shows
+  as "the command about to run" for a wrapped command is now compact and readable instead
+  of a generated multi-line script. Runtime behavior (spill, summary, tail-on-failure, exit
+  code) is unchanged; `quiet_rewrite`'s cache-safety determinism guarantee is preserved.
+  Also standardizes the "read more of this log" hint text across all 5 wrap types —
+  previously inconsistent phrasing ("grep/tail it", "grep that file for the rest",
+  "grep/sed that file...") now consistently names `quiet-tail.sh`/`quiet-agg.sh` or a
+  literal `grep -n`, matching the pattern the JSON/curl path already used correctly.
+
 ### Added
 - **Cache-hit observability** in `bench/session-savings.py` — it now also reports the real
   **cache-hit rate** (`cache_read` / all input tokens) measured across your own Claude Code

@@ -599,7 +599,7 @@ echo "== cache-safety: rendered output is deterministic (never busts the prompt-
   . "$ROOT/core/quiet-core.sh"
   # 1. command rewrites are byte-identical
   cs_ok=1
-  for c in "yarn test" "cargo build --release" "git diff" "grep -r foo ." "curl https://x"; do
+  for c in "yarn test" "cargo build --release" "git diff" "grep -r foo ." "curl https://x" "gh pr diff 1"; do
     [ "$(quiet_rewrite "$c")" = "$(quiet_rewrite "$c")" ] || cs_ok=0
   done
   [ "$cs_ok" = 1 ] && pass "quiet_rewrite renders identical output for identical command" || bad "quiet_rewrite is non-deterministic (cache risk)"
@@ -884,6 +884,131 @@ SKF="$ROOT/skills/deterministic-first/SKILL.md"
 for tok in 'quiet-patch' 'quiet-applies'; do
   grep -qF "$tok" "$SKF" 2>/dev/null && pass "skill mentions $tok" || bad "skill missing $tok"
 done
+
+echo "== qr.sh: generic mode =="
+QR="$ROOT/core/qr.sh"
+r=$(quiet_rewrite "npm install")
+printf '%s' "$r" | grep -qF 'qr.sh generic' && pass "generic: quiet_rewrite routes to qr.sh generic" || bad "generic: quiet_rewrite routes to qr.sh generic"
+printf '%s' "$r" | grep -qF 'mktemp' && bad "generic: rewrite still inlines mktemp" || pass "generic: rewrite has no inline mktemp"
+
+out=$("$QR" generic 'for i in $(seq 1 5); do echo "line $i"; done')
+{ printf '%s' "$out" | grep -qF '[ok: exit 0 — 5 lines hidden in ' \
+  && printf '%s' "$out" | grep -qF 'more: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-tail.sh' \
+  && printf '%s' "$out" | grep -qF "tally: quiet-agg.sh"; } \
+  && pass "generic: success message uses new wording" || bad "generic: success message uses new wording"
+
+out=$("$QR" generic '(echo "line 1"; echo "ERROR: boom"; exit 3)')
+{ printf '%s' "$out" | head -1 | grep -qF '[FAILED: exit 3 —' \
+  && printf '%s' "$out" | grep -qF 'more: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-tail.sh'; } \
+  && pass "generic: FAILED message uses new wording" || bad "generic: FAILED message uses new wording"
+printf '%s' "$out" | grep -qF 'ERROR: boom' && pass "generic: failure tail includes the error" || bad "generic: failure tail includes the error"
+"$QR" generic '(exit 3)' >/dev/null; [ $? -eq 3 ] && pass "generic: exit code passthrough" || bad "generic: exit code passthrough"
+
+GTD=$(mktemp -d)
+( cd "$GTD" \
+  && weird='make ; printf "%s\n" "it'"'"'s here"' \
+  && rw=$(quiet_rewrite "$weird") \
+  && out=$(bash -c "$rw" 2>&1) \
+  && logpath=$(printf '%s' "$out" | grep -oE "${QUIET_LOG_DIR%/}/+${QUIET_LOG_PREFIX}[A-Za-z0-9]+" | head -1) \
+  && [ -n "$logpath" ] && grep -qF "it's here" "$logpath" ) \
+  && pass "generic: %q escaping round-trips quotes through qr.sh" || bad "generic: %q escaping round-trips quotes through qr.sh"
+rm -rf "$GTD"
+
+qrun_out=$(quiet_run printf 'a\nb\n')
+{ printf '%s' "$qrun_out" | grep -qF 'more: ' && printf '%s' "$qrun_out" | grep -qF 'quiet-tail.sh'; } \
+  && pass "quiet_run: success message uses new wording" || bad "quiet_run: success message uses new wording"
+qrun_fail=$(quiet_run sh -c 'echo x; exit 2' 2>/dev/null)
+{ printf '%s' "$qrun_fail" | grep -qF 'more: ' && printf '%s' "$qrun_fail" | grep -qF 'quiet-tail.sh'; } \
+  && pass "quiet_run: FAILED message uses new wording" || bad "quiet_run: FAILED message uses new wording"
+
+echo "== qr.sh: git mode =="
+r=$(quiet_rewrite "git diff")
+printf '%s' "$r" | grep -qF 'qr.sh git' && pass "git: quiet_rewrite routes to qr.sh git" || bad "git: quiet_rewrite routes to qr.sh git"
+printf '%s' "$r" | grep -qF 'mktemp' && bad "git: rewrite still inlines mktemp" || pass "git: rewrite has no inline mktemp"
+
+GD=$(mktemp -d)
+( cd "$GD" && git init -q && git config user.email t@t.com && git config user.name t \
+  && printf 'a\nb\nc\n' > f.txt && git add f.txt && git commit -qm init \
+  && for i in $(seq 1 100); do echo "line $i" >> f.txt; done \
+  && git add f.txt && git commit -qm bulk )
+out=$( cd "$GD" && "$ROOT/core/qr.sh" git 'git log --oneline' 'git log --oneline' )
+printf '%s' "$out" | grep -qF 'bulk' && pass "git: small output shown inline" || bad "git: small output shown inline"
+
+out=$( cd "$GD" && "$ROOT/core/qr.sh" git 'git show nonexistent-ref' 'git show --stat nonexistent-ref' )
+printf '%s' "$out" | grep -qF '[git FAILED: exit' && pass "git: failure message format" || bad "git: failure message format"
+( cd "$GD" && "$ROOT/core/qr.sh" git 'git show nonexistent-ref' 'git show --stat nonexistent-ref' >/dev/null 2>&1 ); [ $? -ne 0 ] && pass "git: exit code passthrough on failure" || bad "git: exit code passthrough on failure"
+rm -rf "$GD"
+
+GD2=$(mktemp -d)
+( cd "$GD2" && git init -q && git config user.email t@t.com && git config user.name t \
+  && printf 'orig\n' > f.txt && git add f.txt && git commit -qm init \
+  && for i in $(seq 1 100); do echo "line $i"; done > f.txt )
+out=$( cd "$GD2" && "$ROOT/core/qr.sh" git 'git diff' 'git diff --stat' )
+{ printf '%s' "$out" | grep -qF 'git output is' \
+  && printf '%s' "$out" | grep -qF 'locate: ' \
+  && printf '%s' "$out" | grep -qF 'tally: quiet-agg.sh'; } \
+  && pass "git: large output uses new locate/tally wording" || bad "git: large output uses new locate/tally wording"
+printf '%s' "$out" | grep -qF 'f.txt' && pass "git: large-output summary shows file stat" || bad "git: large-output summary shows file stat"
+rm -rf "$GD2"
+
+echo "== qr.sh: content mode =="
+r=$(quiet_rewrite "gh pr diff 45")
+printf '%s' "$r" | grep -qF 'qr.sh content' && pass "content: gh pr diff routes to qr.sh content" || bad "content: gh pr diff routes to qr.sh content"
+r2=$(quiet_rewrite "kubectl logs mypod")
+printf '%s' "$r2" | grep -qF 'qr.sh content' && pass "content: kubectl logs routes to qr.sh content" || bad "content: kubectl logs routes to qr.sh content"
+
+out=$("$ROOT/core/qr.sh" content 'echo hello')
+[ "$out" = "hello" ] && pass "content: small output shown inline" || bad "content: small output shown inline"
+
+out=$("$ROOT/core/qr.sh" content 'for i in $(seq 1 100); do echo "line $i"; done')
+{ printf '%s' "$out" | grep -qF 'head+tail below' \
+  && printf '%s' "$out" | grep -qF 'more: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-tail.sh' \
+  && printf '%s' "$out" | grep -qF 'locate: grep -n'; } \
+  && pass "content: large output uses new wording" || bad "content: large output uses new wording"
+{ printf '%s' "$out" | grep -qF 'line 1' && printf '%s' "$out" | grep -qF 'line 100'; } \
+  && pass "content: head+tail both present" || bad "content: head+tail both present"
+printf '%s' "$out" | grep -qF '— grep it' && bad "content: ellipsis still has old trailing hint" || pass "content: ellipsis has no old trailing hint"
+
+echo "== qr.sh: search mode =="
+r=$(quiet_rewrite "ls -R /tmp")
+printf '%s' "$r" | grep -qF 'qr.sh search' && pass "search: ls -R routes to qr.sh search" || bad "search: ls -R routes to qr.sh search"
+r2=$(quiet_rewrite "grep -r foo .")
+printf '%s' "$r2" | grep -qF 'qr.sh search' && pass "search: grep -r routes to qr.sh search" || bad "search: grep -r routes to qr.sh search"
+r3=$(quiet_rewrite "npm ls")
+printf '%s' "$r3" | grep -qF 'qr.sh search' && pass "search: npm ls routes to qr.sh search" || bad "search: npm ls routes to qr.sh search"
+
+out=$("$ROOT/core/qr.sh" search 'echo one; echo two')
+{ printf '%s' "$out" | grep -qF 'one' && printf '%s' "$out" | grep -qF 'two'; } && pass "search: small output shown inline" || bad "search: small output shown inline"
+
+out=$("$ROOT/core/qr.sh" search 'for i in $(seq 1 100); do echo "file_$i.txt"; done')
+{ printf '%s' "$out" | grep -qF 'lines ->' \
+  && printf '%s' "$out" | grep -qF 'locate: grep -n' \
+  && printf '%s' "$out" | grep -qF 'tally: quiet-agg.sh'; } \
+  && pass "search: large output uses new wording" || bad "search: large output uses new wording"
+
+echo "== qr.sh: curl mode =="
+r=$(quiet_rewrite "curl https://example.com")
+printf '%s' "$r" | grep -qF 'qr.sh curl' && pass "curl: routes to qr.sh curl" || bad "curl: routes to qr.sh curl"
+
+out=$(QUIET_JSON_MIN_BYTES=50 "$ROOT/core/qr.sh" curl 'for i in $(seq 1 20); do echo "resp line $i padding padding padding padding padding"; done')
+{ printf '%s' "$out" | grep -qF 'curl returned' \
+  && printf '%s' "$out" | grep -qF 'more: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-tail.sh' \
+  && printf '%s' "$out" | grep -qF 'locate: grep -n'; } \
+  && pass "curl: large non-JSON uses new wording" || bad "curl: large non-JSON uses new wording"
+
+out=$(QUIET_JSON_MIN_BYTES=10 "$ROOT/core/qr.sh" curl 'printf "%s" "{\"items\": [1,2,3,4,5]}"')
+{ printf '%s' "$out" | grep -qF 'curl returned' \
+  && printf '%s' "$out" | grep -qF 'bytes of JSON' \
+  && printf '%s' "$out" | grep -qF 'query: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-query.sh'; } \
+  && pass "curl: large JSON unchanged wording (query: quiet-query.sh)" || bad "curl: large JSON unchanged wording"
+
+out=$("$ROOT/core/qr.sh" curl 'echo small-body')
+[ "$out" = "small-body" ] && pass "curl: small body shown inline" || bad "curl: small body shown inline"
 
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

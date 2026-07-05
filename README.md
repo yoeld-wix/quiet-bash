@@ -608,11 +608,14 @@ To cover more commands, extend the `always`/`managed` patterns in `core/quiet-co
 ## How it works
 
 Each adapter reads its agent's pre-tool event JSON, extracts the shell command, and calls
-`quiet_rewrite` from the core. For a known-verbose command the core returns a rewritten
-command that redirects output to `mktemp` and prints only a summary; the adapter wraps
-that in whatever rewrite field its agent expects. Non-matching commands return nothing, so
-they run unchanged. Each invocation also prunes redirect logs older than
-`QUIET_LOG_RETENTION_MINUTES`.
+`quiet_rewrite` from the core. For a known-verbose command the core returns a short call to
+`core/qr.sh <mode> <cmd>` (e.g. `qr.sh generic npm\ install`) instead of inlining the
+mktemp/redirect/summarize logic as text — so whatever an adapter's UI shows as "the command
+about to run" stays compact and readable. `qr.sh` does the actual work: it runs the
+original command, redirects full output to `mktemp`, and prints only a summary; the
+adapter wraps the one-line call in whatever rewrite field its agent expects. Non-matching
+commands return nothing, so they run unchanged. Each invocation also prunes redirect logs
+older than `QUIET_LOG_RETENTION_MINUTES`.
 
 ## Benchmark
 

@@ -78,123 +78,12 @@ quiet_run() {
   st=$?
   ln=$(wc -l <"$log" | tr -d ' ')
   if [ "$st" -eq 0 ]; then
-    echo "[ok: exit 0 — ${ln} lines hidden in ${log}; grep/tail it only if you need details]"
+    echo "[ok: exit 0 — ${ln} lines hidden in ${log}; more: ${QUIET_CORE_DIR}/quiet-tail.sh ${log} <n> | tally: quiet-agg.sh ${log} '<re>']"
   else
-    echo "[FAILED: exit ${st} — ${ln} lines in ${log} | last ${QUIET_FAIL_TAIL_LINES} below; grep that file for the rest]"
+    echo "[FAILED: exit ${st} — ${ln} lines in ${log} | last ${QUIET_FAIL_TAIL_LINES} below; more: ${QUIET_CORE_DIR}/quiet-tail.sh ${log} <n> | tally: quiet-agg.sh ${log} '<re>']"
     "$QUIET_CORE_DIR/quiet-tail.sh" "$log" "${QUIET_FAIL_TAIL_LINES}" 2>/dev/null || tail -n "${QUIET_FAIL_TAIL_LINES}" "$log"
   fi
   return "$st"
-}
-
-# Generic verbose runner: hide all output on success, tail the log on failure.
-_quiet_wrap_generic() {
-  cat <<WRAP
-__log=\$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
-{
-$1
-} >"\$__log" 2>&1
-__st=\$?
-__ln=\$(wc -l <"\$__log" | tr -d ' ')
-if [ "\$__st" -eq 0 ]; then
-  echo "[ok: exit 0 — \$__ln lines hidden in \$__log; grep/tail it only if you need details]"
-else
-  echo "[FAILED: exit \$__st — \$__ln lines in \$__log | last ${QUIET_FAIL_TAIL_LINES} below; grep that file for the rest]"
-  "${QUIET_CORE_DIR}/quiet-tail.sh" "\$__log" ${QUIET_FAIL_TAIL_LINES} 2>/dev/null || tail -n ${QUIET_FAIL_TAIL_LINES} "\$__log"
-fi
-exit \$__st
-WRAP
-}
-
-# git diff/show/log: show inline when small, else a --stat/--oneline summary.
-_quiet_wrap_git() {
-  cat <<WRAP
-__log=\$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
-{
-$1
-} >"\$__log" 2>&1
-__st=\$?
-__ln=\$(wc -l <"\$__log" | tr -d ' ')
-if [ "\$__st" -ne 0 ]; then
-  echo "[git FAILED: exit \$__st — \$__ln lines in \$__log | last ${QUIET_FAIL_TAIL_LINES} below]"
-  "${QUIET_CORE_DIR}/quiet-tail.sh" "\$__log" ${QUIET_FAIL_TAIL_LINES} 2>/dev/null || tail -n ${QUIET_FAIL_TAIL_LINES} "\$__log"
-elif [ "\$__ln" -le ${QUIET_INLINE_LINE_LIMIT} ]; then
-  cat "\$__log"
-else
-  echo "[git output is \$__ln lines -> \$__log | summary below; grep/sed that file for specific files or hunks]"
-  { $2 ; } 2>/dev/null | head -n 200
-fi
-exit \$__st
-WRAP
-}
-
-# Content command (e.g. `gh run view --log`, `gh pr diff`): the agent wants the
-# output, so show it inline when small; when large, spill the full content and
-# surface a cleaned tail + a grep pointer (lossless — full output on disk).
-_quiet_wrap_content() {
-  cat <<WRAP
-__log=\$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
-{
-$1
-} >"\$__log" 2>&1
-__st=\$?
-__ln=\$(wc -l <"\$__log" | tr -d ' ')
-if [ "\$__ln" -le ${QUIET_INLINE_LINE_LIMIT} ]; then
-  cat "\$__log"
-else
-  echo "[output is \$__ln lines -> \$__log | head+tail below; grep that file for the rest]"
-  head -n 15 "\$__log"
-  echo "   ⋮ (\$((__ln - 40)) more lines in \$__log — grep it)"
-  "${QUIET_CORE_DIR}/quiet-tail.sh" "\$__log" 25 2>/dev/null || tail -n 25 "\$__log"
-fi
-exit \$__st
-WRAP
-}
-
-# Recursive listing (ls -R / tree / find <path>): can dump thousands of entries.
-# Spill the full listing and show the first lines + count + a grep pointer
-# (lossless). Head sample (not tail) because listings are read top-down.
-_quiet_wrap_search() {
-  cat <<WRAP
-__log=\$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
-{
-$1
-} >"\$__log" 2>&1
-__st=\$?
-__ln=\$(wc -l <"\$__log" | tr -d ' ')
-if [ "\$__ln" -le ${QUIET_INLINE_LINE_LIMIT} ]; then
-  cat "\$__log"
-else
-  echo "[\$__ln lines -> \$__log | first ${QUIET_FAIL_TAIL_LINES} below; grep/sed that file for the rest]"
-  head -n ${QUIET_FAIL_TAIL_LINES} "\$__log"
-fi
-exit \$__st
-WRAP
-}
-
-# Network fetch (curl): large API responses are a context sink, and JSON ones
-# are often minified to a single line (head/tail useless). Spill full; collapse
-# JSON via quiet-json; else head+tail. Small responses pass inline. Lossless.
-_quiet_wrap_curl() {
-  cat <<WRAP
-__log=\$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
-{
-$1
-} >"\$__log" 2>&1
-__st=\$?
-__by=\$(wc -c <"\$__log" | tr -d ' ')
-if [ "\$__by" -le ${QUIET_JSON_MIN_BYTES} ]; then
-  cat "\$__log"
-elif command -v jq >/dev/null 2>&1 && jq -e . "\$__log" >/dev/null 2>&1 && mv "\$__log" "\$__log.json" 2>/dev/null; then
-  echo "[curl returned \$__by bytes of JSON -> \$__log.json | collapsed below; query: ${QUIET_CORE_DIR}/quiet-query.sh \$__log.json keys]"
-  "${QUIET_CORE_DIR}/quiet-json.sh" "\$__log.json"
-else
-  __ln=\$(wc -l <"\$__log" | tr -d ' ')
-  echo "[curl returned \$__by bytes / \$__ln lines -> \$__log | head+tail below; grep that file for the rest]"
-  head -n 15 "\$__log"
-  "${QUIET_CORE_DIR}/quiet-tail.sh" "\$__log" 25 2>/dev/null || tail -n 25 "\$__log"
-fi
-exit \$__st
-WRAP
 }
 
 # ── Summarize a large tool RESULT (for PostToolUse-style adapters) ───────────
@@ -290,7 +179,7 @@ quiet_rewrite() {
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)diff/\1git\2diff --stat/' \
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)show/\1git\2show --stat/' \
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)log/\1git\2log --oneline/')
-    _quiet_wrap_git "$cmd" "$summary"
+    printf '%q %q %q %q' "${QUIET_CORE_DIR}/qr.sh" "git" "$cmd" "$summary"
     return 0
   fi
 
@@ -304,7 +193,7 @@ quiet_rewrite() {
   local ghlogflag_re='(^|[[:space:]])--log(-failed)?([[:space:]]|$)'   # bounded: not --log-url/--logout
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* ]] \
      && { { [[ $cmd =~ $ghrun_re ]] && [[ $cmd =~ $ghlogflag_re ]]; } || [[ $cmd =~ $ghdiff_re ]]; }; then
-    _quiet_wrap_content "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "content" "$cmd"
     return 0
   fi
 
@@ -318,7 +207,7 @@ quiet_rewrite() {
   local find_re='(^|[[:space:];&|(])find[[:space:]]+[^-]'
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* && $cmd != *-exec* ]] \
      && { [[ $cmd =~ $lsr_re ]] || [[ $cmd =~ $tree_re ]] || [[ $cmd =~ $find_re ]]; }; then
-    _quiet_wrap_search "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "search" "$cmd"
     return 0
   fi
 
@@ -335,7 +224,7 @@ quiet_rewrite() {
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* && $cmd != *-exec* ]] \
      && { { [[ $cmd =~ $grep_re ]] && [[ $cmd =~ $recflag_re ]]; } || [[ $cmd =~ $rg_re ]]; } \
      && ! [[ $cmd =~ $sbound_re ]]; then
-    _quiet_wrap_search "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "search" "$cmd"
     return 0
   fi
 
@@ -348,7 +237,7 @@ quiet_rewrite() {
   local curlfile_re='(^|[[:space:]])(-o|--output|-O|--remote-name|-I|--head)([[:space:]]|$)'
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* ]] \
      && [[ $cmd =~ $curl_re ]] && ! [[ $cmd =~ $curlfile_re ]]; then
-    _quiet_wrap_curl "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "curl" "$cmd"
     return 0
   fi
 
@@ -361,8 +250,8 @@ quiet_rewrite() {
   local logdump_re='(^|[[:space:];&|(])(kubectl[[:space:]]+logs|docker[[:space:]]+logs|journalctl|dmesg)([[:space:]]|$)'
   local help_re='(^|[[:space:]])(-h|--help|--version|version)([[:space:]]|$)'
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* ]] && ! [[ $cmd =~ $help_re ]]; then
-    if [[ $cmd =~ $listing_re ]]; then _quiet_wrap_search  "$cmd"; return 0; fi
-    if [[ $cmd =~ $logdump_re ]]; then _quiet_wrap_content "$cmd"; return 0; fi
+    if [[ $cmd =~ $listing_re ]]; then printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "search" "$cmd"; return 0; fi
+    if [[ $cmd =~ $logdump_re ]]; then printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "content" "$cmd"; return 0; fi
   fi
 
   # ── verbose-runner path: build/test/install/CI tooling across ecosystems ──
@@ -384,7 +273,7 @@ quiet_rewrite() {
   local verbose_re="${pre}(${always}|${managed})"
 
   if [[ $cmd =~ $verbose_re ]]; then
-    _quiet_wrap_generic "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "generic" "$cmd"
     return 0
   fi
 
