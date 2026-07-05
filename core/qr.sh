@@ -83,6 +83,26 @@ search)
   exit "$st"
   ;;
 
+curl)
+  log=$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
+  bash -c "$cmd" >"$log" 2>&1
+  st=$?
+  by=$(wc -c <"$log" | tr -d ' ')
+  if [ "$by" -le "${QUIET_JSON_MIN_BYTES}" ]; then
+    cat "$log"
+  elif command -v jq >/dev/null 2>&1 && jq -e . "$log" >/dev/null 2>&1 && mv "$log" "$log.json" 2>/dev/null; then
+    log="$log.json"
+    echo "[curl returned ${by} bytes of JSON -> ${log} | collapsed below; query: ${QUIET_CORE_DIR}/quiet-query.sh ${log} keys]"
+    "$QUIET_CORE_DIR/quiet-json.sh" "$log"
+  else
+    ln=$(wc -l <"$log" | tr -d ' ')
+    echo "[curl returned ${by} bytes / ${ln} lines -> ${log} | head+tail below; more: ${QUIET_CORE_DIR}/quiet-tail.sh ${log} <n> | locate: grep -n '<pattern>' ${log}]"
+    head -n 15 "$log"
+    "$QUIET_CORE_DIR/quiet-tail.sh" "$log" 25 2>/dev/null || tail -n 25 "$log"
+  fi
+  exit "$st"
+  ;;
+
 *)
   echo "qr: unknown mode '$mode'" >&2
   exit 2

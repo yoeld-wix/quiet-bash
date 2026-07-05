@@ -348,7 +348,7 @@ quiet_rewrite() {
   local curlfile_re='(^|[[:space:]])(-o|--output|-O|--remote-name|-I|--head)([[:space:]]|$)'
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* ]] \
      && [[ $cmd =~ $curl_re ]] && ! [[ $cmd =~ $curlfile_re ]]; then
-    _quiet_wrap_curl "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "curl" "$cmd"
     return 0
   fi
 

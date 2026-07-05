@@ -989,5 +989,26 @@ out=$("$ROOT/core/qr.sh" search 'for i in $(seq 1 100); do echo "file_$i.txt"; d
   && printf '%s' "$out" | grep -qF 'tally: quiet-agg.sh'; } \
   && pass "search: large output uses new wording" || bad "search: large output uses new wording"
 
+echo "== qr.sh: curl mode =="
+r=$(quiet_rewrite "curl https://example.com")
+printf '%s' "$r" | grep -qF 'qr.sh curl' && pass "curl: routes to qr.sh curl" || bad "curl: routes to qr.sh curl"
+
+out=$(QUIET_JSON_MIN_BYTES=50 "$ROOT/core/qr.sh" curl 'for i in $(seq 1 20); do echo "resp line $i padding padding padding padding padding"; done')
+{ printf '%s' "$out" | grep -qF 'curl returned' \
+  && printf '%s' "$out" | grep -qF 'more: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-tail.sh' \
+  && printf '%s' "$out" | grep -qF 'locate: grep -n'; } \
+  && pass "curl: large non-JSON uses new wording" || bad "curl: large non-JSON uses new wording"
+
+out=$(QUIET_JSON_MIN_BYTES=10 "$ROOT/core/qr.sh" curl 'printf "%s" "{\"items\": [1,2,3,4,5]}"')
+{ printf '%s' "$out" | grep -qF 'curl returned' \
+  && printf '%s' "$out" | grep -qF 'bytes of JSON' \
+  && printf '%s' "$out" | grep -qF 'query: ' \
+  && printf '%s' "$out" | grep -qF 'quiet-query.sh'; } \
+  && pass "curl: large JSON unchanged wording (query: quiet-query.sh)" || bad "curl: large JSON unchanged wording"
+
+out=$("$ROOT/core/qr.sh" curl 'echo small-body')
+[ "$out" = "small-body" ] && pass "curl: small body shown inline" || bad "curl: small body shown inline"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
