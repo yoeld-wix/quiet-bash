@@ -37,6 +37,7 @@ command -v jq >/dev/null 2>&1 || exec cat "$f"
 : "${QUIET_JSON_STATS_MIN_ITEMS:=10}"
 : "${QUIET_JSON_STATS_MAX_ITEMS:=100000}"
 : "${QUIET_JSON_STATS_MAX_FIELDS:=20}"
+: "${QUIET_JSON_STATS_DECIMALS:=4}"
 
 # Get JSON out of the file (yaml via the shared core converter).
 case "$f" in
@@ -77,8 +78,10 @@ echo "[quiet-bash] $f — ${bytes} bytes, ${lines} lines, ${fmt}. Collapsed prev
 printf '%s\n' "$summary"
 
 if [ "$QUIET_JSON_AUTOSTATS" = "1" ]; then
+  stats_mult=$((10 ** QUIET_JSON_STATS_DECIMALS))
   stats_program='
-def numstats($vals): {min:($vals|min), max:($vals|max), avg:(($vals|add)/($vals|length))};
+def rnd: (. * '"$stats_mult"' | round) / '"$stats_mult"';
+def numstats($vals): {min:($vals|min|rnd), max:($vals|max|rnd), avg:(($vals|add)/($vals|length)|rnd)};
 def fieldstats($arr; $k):
   ($arr | map(.[$k]) | map(select(. != null))) as $vals
   | ($vals|length) as $n
@@ -106,7 +109,8 @@ def fieldstats($arr; $k):
   else null end
 '
   if stats=$(printf '%s' "$json" | jq "$stats_program" 2>/dev/null) && [ "$stats" != "null" ]; then
-    echo "[quiet-bash] Auto-computed field stats (over all records, not just the sample above):"
+    echo "[quiet-bash] EXACT stats below, computed over ALL records (not the sample above)."
+    echo "[quiet-bash] These are final, pre-rounded values — use them as-is, no further jq/computation needed:"
     printf '%s\n' "$stats"
   fi
 fi

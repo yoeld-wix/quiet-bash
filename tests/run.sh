@@ -139,12 +139,19 @@ ATMP=$(mktemp -d)
 recs="$ATMP/records.json"
 jq -n '[range(20)|{id:., status:(if .%2==0 then "open" else "closed" end), price:(10+.)}]' > "$recs"
 default_out=$("$ROOT/core/quiet-json.sh" "$recs")
-echo "$default_out" | grep -q 'Auto-computed field stats' && bad "autostats ran without opt-in" || pass "autostats off by default"
+echo "$default_out" | grep -q 'EXACT stats below' && bad "autostats ran without opt-in" || pass "autostats off by default"
 stats_out=$(QUIET_JSON_AUTOSTATS=1 "$ROOT/core/quiet-json.sh" "$recs")
-echo "$stats_out" | grep -q 'Auto-computed field stats' && pass "autostats section present when opted in" || bad "autostats section missing"
+echo "$stats_out" | grep -q 'EXACT stats below' && pass "autostats section present when opted in" || bad "autostats section missing"
 echo "$stats_out" | grep -q '"record_count": 20' && pass "autostats record_count correct" || bad "autostats record_count wrong"
 echo "$stats_out" | grep -q '"min": 10' && echo "$stats_out" | grep -q '"max": 29' && pass "autostats numeric min/max correct" || bad "autostats numeric stats wrong"
 echo "$stats_out" | grep -q '"distinct": 2' && pass "autostats string distinct-count correct" || bad "autostats string stats wrong"
+# avg must be pre-rounded (QUIET_JSON_STATS_DECIMALS), not a long raw float —
+# a model asked to hand-round a long float sometimes botches the arithmetic
+fracrec="$ATMP/frac.json"
+jq -n '[range(0;3)|{id:., price:(10+./3)}]' > "$fracrec"
+frac_out=$(QUIET_JSON_AUTOSTATS=1 QUIET_JSON_STATS_MIN_ITEMS=3 "$ROOT/core/quiet-json.sh" "$fracrec")
+{ echo "$frac_out" | grep -q '"avg"' && ! echo "$frac_out" | grep -qE '"avg": [0-9]+\.[0-9]{5,}'; } \
+  && pass "autostats avg is pre-rounded" || bad "autostats avg not pre-rounded"
 # below the item-count floor -> no stats section even when opted in
 tiny="$ATMP/tiny.json"
 jq -n '[range(3)|{id:.}]' > "$tiny"

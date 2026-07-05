@@ -23,12 +23,15 @@ All notable changes to this project are documented here. Format follows
 - **JSON auto-stats (opt-in, `QUIET_JSON_AUTOSTATS=1`)** in `core/quiet-json.sh` — when a large
   JSON read's root is an array of uniform records, compute per-field stats (count/min/max/avg for
   numbers, distinct-count + top values for low-cardinality strings) over the **full** array, not
-  just the 3-item folded sample, and attach them to the collapsed preview. Mechanical (jq-only, no
-  LLM call), off by default. A first pilot (n=4) looked like a clean correctness win; a follow-up
-  at n=40/arm with a proper significance test found **no real effect** (35/40 vs 36/40 correct,
-  p=0.72) and cost directionally worse (+8.3%) — the n=4 result traced to a grading-script bug, not
-  a real difference. Full account, including the correction, in `bench/RESULTS.md` § "JSON
-  auto-stats." Kept opt-in; not proven as a cost or correctness lever at this scale.
+  just the 3-item folded sample, and attach them to the collapsed preview, pre-rounded
+  (`QUIET_JSON_STATS_DECIMALS`, default 4) so the model isn't left to round a 17-digit float itself.
+  Mechanical (jq-only, no LLM call), off by default. Two independent n=40/arm significance tests
+  (logistic regression + Fisher's exact) found **no real cost or correctness effect** — a root-cause
+  dig via full tool-call transcripts found the recurring wrong answers trace to the model's own
+  reasoning (conflating a status-filtered subset with the full-record aggregate, or a jq
+  rounding-order bug) that recurs *even when the correct answer is already handed to it*, which a
+  preview-formatting change can't fix. Full account in `bench/RESULTS.md` § "JSON auto-stats."
+  Kept opt-in; not proven as a cost or correctness lever.
 - **Cache-hit observability** in `bench/session-savings.py` — it now also reports the real
   **cache-hit rate** (`cache_read` / all input tokens) measured across your own Claude Code
   transcripts, with the fresh / cache-read / cache-creation token split. This is the

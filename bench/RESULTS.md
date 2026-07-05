@@ -299,3 +299,53 @@ arrays like `{"items":[...]}`, richer per-field stats), it should be
 re-benchmarked at this n=40+ scale from the start, not re-validated at n=4.
 Reproduce: `bench/json-autostats.sh`. Runs: 2026-07-05 (n=4), 2026-07-05 (n=40,
 corrected).
+
+### Root cause, and a real fix that still didn't move the number
+
+Captured full tool-call transcripts (`--output-format stream-json`) for both
+arms to find out *why* ~12–25% of runs get the aggregate wrong. Two mechanical
+bugs, both in `core/quiet-json.sh`, both fixed:
+
+1. **The auto-computed `avg` was an unrounded 17-digit float**
+   (`255.17747799999998`), forcing the model to round it itself — and it
+   sometimes botched that (`255.00`, via the classic jq gotcha
+   `avg | round * 100 / 100`, which rounds to an *integer* before scaling,
+   instead of `(avg*100|round)/100`). **Fixed:** stats are now pre-rounded
+   (`QUIET_JSON_STATS_DECIMALS`, default 4).
+2. **The message read like raw data to process, not a finished answer.**
+   **Fixed:** reworded to "EXACT stats... use them as-is, no further
+   jq/computation needed."
+
+Neither fix moved the needle. Re-running n=40/arm against the fixed code:
+
+```
+| arm                                  | cost $ | turns | correct | runs |
+|----------------------------------------|-------:|------:|--------:|-----:|
+| A baseline (no autostats)              | 0.0287 |   3.9 |    35/40 |  40 |
+| B autostats (QUIET_JSON_AUTOSTATS=1)   | 0.0258 |   3.5 |    30/40 |  40 |
+
+GLM: is_autostats coef -0.847 (p=0.159), odds ratio 0.43x
+Fisher's exact: p=0.25 — still not significant, point estimate now favors baseline
+```
+
+**Why the fix didn't help:** the recurring wrong answers aren't random noise —
+they're a small number of *specific* bugs the model repeats regardless of arm.
+`262.19` appears constantly in both arms; it is *exactly* the average price of
+`status=="open"` orders only (262.1876...) — the model conflates the two
+sub-questions, reusing the status filter from part (1) when computing part
+(2)'s average over *all* records. `2.55` (off by 100×) and `255.00` (the
+round-order bug, still occurring even in the fixed autostats arm) round out the
+pattern. **Even with the correct, pre-rounded, directively-labeled answer
+already sitting in the tool output, the model sometimes still writes its own
+verification jq and overwrites a correct given answer with a self-computed
+wrong one.** That's not a bug quiet-bash's output formatting can fix — it's a
+ceiling on how much a preview-enrichment feature can help when the calling
+model doesn't reliably trust and reuse a provided value over re-deriving it.
+
+**Final verdict: `QUIET_JSON_AUTOSTATS` has no demonstrated cost or
+correctness benefit, on two independent n=40 tests, even after fixing the two
+mechanical issues the investigation surfaced.** Kept opt-in (harmless, small
+preview-size cost) but should not be marketed as either a cost or a
+correctness lever without a task shape that shows a real, significant effect.
+The two code fixes (pre-rounded stats, directive wording) are real
+improvements and were kept regardless of the null result.

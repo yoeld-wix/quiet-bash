@@ -109,6 +109,27 @@ disclosure was explicitly **refuted** on reverification — don't cite it).
 > doc where a small-n pilot pointed the wrong way (see #1's cache-warmup
 > confound above), which is itself the load-bearing lesson: **benchmark size
 > discipline matters more here than any individual technique.**
+>
+> **Follow-up root-cause dig (same day):** captured full tool-call transcripts
+> to find out why ~12–25% of runs get the aggregate wrong in *both* arms.
+> Found and fixed two real mechanical issues in `quiet-json.sh` — the
+> auto-computed `avg` was an unrounded 17-digit float forcing the model to
+> round it itself (a classic jq gotcha, `round` before scaling instead of
+> after, produces `255.00` instead of `255.18`), and the message read like raw
+> data rather than a finished answer. Fixed both (pre-rounding, directive
+> wording) and **re-ran n=40/arm against the fixed code — still no
+> significant difference** (30/40 vs 35/40, p=0.16). Root cause: recurring
+> wrong answers (`262.19`, appearing constantly in both arms) trace to the
+> model conflating the two sub-questions — computing the price average over
+> the status-filtered subset instead of all records — a reasoning error that
+> happens **regardless of what the tool output says**, since it sometimes
+> recomputes from scratch even when handed the correct, pre-rounded,
+> directively-labeled answer. **This is a ceiling a preview-formatting change
+> cannot fix**: the model doesn't reliably trust and reuse a provided value
+> over re-deriving its own. Final verdict: no demonstrated benefit on two
+> independent n=40 tests even after fixing what was fixable. Full account in
+> `bench/RESULTS.md` § "Root cause, and a real fix that still didn't move the
+> number."
 
 ### 3. Cross-file, budget-constrained relevance ranking (Aider repo-map style) — still unbuilt
 
