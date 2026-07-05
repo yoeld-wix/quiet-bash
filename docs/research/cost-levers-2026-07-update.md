@@ -38,9 +38,19 @@ client for free.
 - **Feasibility: high.** No new dependency; extends code that already exists.
 - **Cache caveat (see #2 below):** must be append-only / stable-stub ordering,
   or the schema-splice will itself bust the cache prefix it's trying to protect.
-- **Open question:** worth prototyping only for multi-server setups with heavy
-  tool-list weight (5+ MCP servers) — a single small server's schema isn't worth
-  the added round-trip.
+
+> **Measured (2026-07-05), verdict: do not ship as prototyped.** Built
+> `proxy/quiet-mcp-tools-proxy.mjs` (list_tools/get_tool_schema/call_tool
+> wrapper) and ran a live A/B (`bench/mcp-schema-deferral.sh`) against a 90-tool
+> fake MCP server. The `tools/list` payload shrank 99% as predicted, but real
+> session cost was **74% *higher*** for the deferred arm, consistently across
+> all reps — the extra `list_tools`→`call_tool` round trip costs more in
+> `cache_creation` (priced above 1×) and growing-transcript `cache_read` than
+> the schema bytes saved, on a short, few-turn task. Full write-up:
+> `bench/RESULTS.md` § "MCP schema-deferral prototype." Only reconsider for
+> very long, tool-call-heavy sessions where the extra turn amortizes, or if the
+> round-trip itself can be eliminated (client-native support, not a
+> transport-layer proxy).
 
 Sources: <https://www.anthropic.com/engineering/advanced-tool-use>,
 <https://code.claude.com/docs/en/prompt-caching> (deferred-tools mechanism,

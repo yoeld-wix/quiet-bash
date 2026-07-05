@@ -137,3 +137,68 @@ regression" on the package-lock task; root-cause investigation showed it was
 turn-count variance amplified by that summing — the PostToolUse hook never even
 fired in the repro. Reporting cost + a fresh/cache-read split avoids that trap.
 Run: 2026-06-28.
+
+## MCP schema-deferral prototype — live A/B (verdict: do not ship as prototyped)
+
+Follow-up to `docs/research/cost-levers-2026-07-update.md` candidate #1
+(deferring MCP tool *schemas*, not just results). Prototype:
+`proxy/quiet-mcp-tools-proxy.mjs` wraps an MCP server and exposes exactly 3
+meta-tools (`list_tools` / `get_tool_schema` / `call_tool`) instead of the
+server's real tool list — the "search first" pattern used by Anthropic's Tool
+Search Tool and Atlassian's mcp-compressor, ported to the transport layer so it
+works with any MCP client, not just Claude Code.
+
+**Mechanical effect confirmed** — the raw `tools/list` payload shrinks hard as
+tool count grows (`bench/fixtures/many-tools-server.mjs`, N tools with
+realistic ~200–300 B schemas each):
+
+| tools (N) | full tools/list | deferred (3 meta-tools) | reduction |
+|--:|--:|--:|--:|
+| 10 | 7,007 B (~1,751 tok) | 714 B (~178 tok) | 90% |
+| 40 | 27,317 B (~6,829 tok) | 714 B | 98% |
+| 90 | 61,167 B (~15,291 tok) | 714 B | 99% |
+
+**But that didn't translate into real session savings.** Live A/B
+(`bench/mcp-schema-deferral.sh`, `claude-haiku-4-5`, 90-tool server matching the
+"94-tool GitHub server" scale cited in prior research, single-tool-call task,
+3 repeats):
+
+```
+| arm                                | cost $ | cache-read | cache-create | turns | correct | runs |
+|-------------------------------------|-------:|-----------:|-------------:|------:|--------:|-----:|
+| A full (real schemas)               | 0.0276 |    115,954 |         6,786 |   4.3 |     3/3 |   3  |
+| B deferred (proxy, 3 meta-tools)    | 0.0481 |    133,615 |         9,719 |   5.3 |     3/3 |   3  |
+
+deferred vs full: cost -74.2% (i.e. 74% MORE expensive)
+```
+
+Per-rep costs were consistent in direction (not just the mean): deferred cost
+more than full on all 3 reps (0.0432 vs 0.0339, 0.0582 vs 0.0100, 0.0431 vs
+0.0391).
+
+**Why it lost, despite cutting schema bytes 99%:** the client must call
+`list_tools` (discover the real tool exists) before it can `call_tool` — at
+least one extra conversational turn versus calling the real tool directly. Each
+extra turn re-processes the growing transcript (more `cache_read`) *and* writes
+a new increment to the cache (`cache_creation`, priced above 1×) to extend the
+prefix for the next turn. On a short, one-or-two-tool-call task, that per-turn
+tax outweighs the one-time schema-byte saving. A smaller pilot at N=20 tools,
+1 rep, showed the same pattern at roughly break-even (-0.6%).
+
+**Verdict: do not ship this design.** The "search first" wrapper is a real,
+working, zero-LLM-call mechanism (mechanically confirmed above) — but as
+prototyped it's a net cost *regression* on typical short agentic tasks, which
+is what most quiet-bash-covered work looks like. It only stands a chance of
+paying off where (a) the session is long/tool-call-heavy enough to amortize the
+extra turns, or (b) the underlying tool count is even larger than 90, or (c)
+the round-trip tax itself is eliminated (e.g. a client-native mechanism like
+Anthropic's Tool Search Tool that doesn't cost a full extra conversational
+turn). This is a **measured caution against the "smaller payload = cheaper"
+intuition** the same way `docs/token-reduction-research.md`'s cache-safety
+headline finding warned against it for transcript pruning — the fix here isn't
+more compression, it's removing the extra turn, which this transport-layer
+proxy design cannot do on its own.
+
+Caveats: n=3 (+1 pilot at n=1), one task shape (single tool discovery + call),
+one model (Haiku). Directional, not definitive — but the sign was consistent
+across every rep. Reproduce: `bench/mcp-schema-deferral.sh`. Run: 2026-07-05.
