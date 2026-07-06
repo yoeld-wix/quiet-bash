@@ -349,3 +349,55 @@ preview-size cost) but should not be marketed as either a cost or a
 correctness lever without a task shape that shows a real, significant effect.
 The two code fixes (pre-rounded stats, directive wording) are real
 improvements and were kept regardless of the null result.
+
+## quiet-repomap prototype — live A/B (verdict: real, significant win — shipped)
+
+Candidate #3 from `docs/research/cost-levers-2026-07-update.md` (Aider-style
+cross-file relevance ranking). `core/quiet-repomap.sh` is a zero-dependency
+approximation: grep import/require (JS/TS) and import/from (Python)
+statements, resolve each target to a repo file by basename match (not full
+module resolution — approximate by design, documented in the script header),
+and rank files by in-degree (how many other files import them). Complements
+`quiet-map` (file-size/churn) and `quiet-outline` (per-file signatures) rather
+than replacing them.
+
+**Live A/B** (`bench/repomap-orient.sh`): a synthetic fixture
+(`bench/fixtures/make-repomap-fixture.sh`) with one file imported by 9 others
+and an unambiguous ground truth. Task: "identify the single file the rest of
+the codebase depends on most." Two arms — `baseline` explores cold with Bash
+only; `repomap` gets the `quiet-repomap.sh` output prepended to the task, as
+if a session-start hook had already surfaced it (mirrors how `quiet-env`/
+`quiet-map` are actually used, not a tool the agent has to discover itself).
+
+n=8 pilot showed a clean, non-overlapping effect (every baseline rep cost more
+than every repomap rep) — unlike the auto-stats candidate, this one didn't
+need a correction. Confirmed at n=20/arm with a significance test:
+
+```
+| arm                       | cost $ | turns | output tok | correct | runs |
+|----------------------------|-------:|------:|-----------:|--------:|-----:|
+| A baseline (cold explore)  | 0.0530 |   3.4 |        927 |   19/19 |  19  |
+| B repomap (pre-surfaced)   | 0.0123 |   1.0 |        207 |   20/20 |  20  |
+
+repomap vs baseline: cost +76.8% (cheaper), turns 3.4 -> 1.0
+Mann-Whitney U (cost):  p=5.1e-08  SIGNIFICANT
+Mann-Whitney U (turns): p=6.4e-08  SIGNIFICANT
+```
+
+(One baseline rep produced no output — a transient CLI timeout, dropped, n=19
+for that arm.) Correctness was ~100% in both arms — the win is entirely in
+**turns eliminated**: repomap answered in exactly 1 turn every single time (no
+tool calls needed), baseline needed a median of 3+ turns of `ls`/`grep`/`cat`
+exploration to reach the same answer, each turn re-paying the growing
+transcript.
+
+**Verdict: real, significant, and mechanistically obvious — shipped as
+`core/quiet-repomap.sh` with tests.** Unlike the JSON auto-stats candidate,
+this isn't marginal: the effect is large (77% cost, ~2.4 fewer turns) and
+consistent from n=8 to n=20 with no sign flip. Caveats: single synthetic
+fixture with a deliberately unambiguous answer (a real repo's "most central
+file" may be less clear-cut, and basename-only import resolution will
+misattribute in a repo with duplicate basenames across directories); one
+model (Haiku); the task shape (a single orientation question, no downstream
+edit) is narrower than a full coding task. Reproduce: `bench/repomap-orient.sh`.
+Run: 2026-07-06.

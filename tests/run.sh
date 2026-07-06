@@ -821,6 +821,39 @@ QUIET_MAP_BIG_LINES=10 "$QM" | grep -q '⚠' && pass "quiet-map flags big files"
 "$QM" --tree | grep -q 'core' && pass "quiet-map --tree lists dirs" || bad "quiet-map tree"
 "$QM" --bogus >/dev/null 2>&1; [ $? -eq 2 ] && pass "quiet-map unknown flag exit 2" || bad "quiet-map unknown flag"
 
+echo "== quiet-repomap =="
+QRM="$ROOT/core/quiet-repomap.sh"
+RMT=$(mktemp -d)
+( cd "$RMT" && git init -q && mkdir -p src
+  cat > src/logger.js <<'JS'
+export function log(m) { console.log(m); }
+JS
+  cat > src/validate.js <<'JS'
+import { log } from './logger';
+export function validate(x) { log('v'); return !!x; }
+JS
+  cat > src/auth.js <<'JS'
+import { log } from './logger';
+import { validate } from './validate';
+export function auth(u) { validate(u); log('auth'); }
+JS
+  cat > src/app.js <<'JS'
+import { auth } from './auth';
+import { log } from './logger';
+auth(); log('app');
+JS
+  git add -A && git commit -qm init >/dev/null )
+rmout=$(cd "$RMT" && "$QRM")
+echo "$rmout" | grep -q '\[quiet-repomap\] most-imported' && pass "quiet-repomap runs" || bad "quiet-repomap runs"
+# logger.js is imported by validate/auth/app (3) — should rank first with the highest count
+top_line=$(printf '%s\n' "$rmout" | grep -E '^\s*[0-9]+\s+src/' | head -1)
+echo "$top_line" | grep -q 'logger.js' && pass "quiet-repomap ranks most-imported file first" || bad "quiet-repomap ranking wrong"
+echo "$top_line" | grep -qE '^\s*3\s' && pass "quiet-repomap in-degree count correct" || bad "quiet-repomap count wrong"
+rm -rf "$RMT"
+ND=$(mktemp -d); ( cd "$ND" && git init -q >/dev/null && : > README.md && git add -A && git commit -qm x >/dev/null && "$QRM" ) \
+  | grep -q 'no JS/TS/Python source files found' && pass "quiet-repomap handles no-source-files repo" || bad "quiet-repomap empty repo"
+rm -rf "$ND"
+
 echo "== bench: enrichment grading =="
 . "$ROOT/bench/enrichment-tasks.sh"
 [ "$(fm_grade 0 'You would edit core/quiet-core.sh for that')" = pass ] && pass "fm_grade correct→pass" || bad "fm_grade correct"

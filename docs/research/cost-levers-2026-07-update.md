@@ -131,7 +131,7 @@ disclosure was explicitly **refuted** on reverification — don't cite it).
 > `bench/RESULTS.md` § "Root cause, and a real fix that still didn't move the
 > number."
 
-### 3. Cross-file, budget-constrained relevance ranking (Aider repo-map style) — still unbuilt
+### 3. Cross-file, budget-constrained relevance ranking (Aider repo-map style) — shipped ⭐ real win
 
 `docs/token-reduction-research.md` already cites Aider's tree-sitter+PageRank
 repo map as prior art for **per-file** signature outlining, which quiet-bash has
@@ -148,7 +148,27 @@ docs.aider.chat cross-check).
   `grep`/`awk` instead of AST parsing — could capture most of the ranking value
   without the new dependency, but this is unverified and would need its own
   accuracy check before committing to it.
-- **Priority: exploratory**, not a committed feature — open question, see below.
+
+> **Measured (2026-07-06), verdict: real, significant win — shipped.** Built
+> the `grep`/`awk` import-graph-in-degree approximation exactly as scoped
+> above: `core/quiet-repomap.sh` (JS/TS + Python only for v1; basename-matched
+> import resolution, not full module resolution — documented limitation).
+> Live A/B (`bench/repomap-orient.sh`) on a synthetic fixture with an
+> unambiguous ground truth (one file imported by 9 others): a "which file is
+> most central" orientation task, one arm exploring cold with Bash, the other
+> given the repomap output up front (as a session-start hook would surface
+> it). n=8 pilot showed a clean, non-overlapping cost effect; **confirmed at
+> n=20/arm with a Mann-Whitney U test: cost -76.8% (p=5.1e-08), turns 3.4→1.0
+> (p=6.4e-08), both highly significant, correctness ~100% in both arms.**
+> Unlike candidate #2, this effect didn't need correcting — same direction and
+> similar magnitude from n=8 through n=20. Mechanistically simple: the
+> baseline arm needs several `ls`/`grep`/`cat` turns to work out the answer;
+> the repomap arm needs zero, since the ranking is already the answer. Shipped
+> with unit tests. Caveats: single synthetic fixture with a deliberately
+> unambiguous winner, one model (Haiku), a narrow single-question task shape —
+> a real repo's "most central file" may be less clear-cut, and basename-only
+> resolution will misattribute in a repo with duplicate basenames across
+> directories. Full write-up: `bench/RESULTS.md` § "quiet-repomap prototype."
 
 ---
 

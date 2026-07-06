@@ -20,6 +20,16 @@ All notable changes to this project are documented here. Format follows
   literal `grep -n`, matching the pattern the JSON/curl path already used correctly.
 
 ### Added
+- **`quiet-repomap`** (`core/quiet-repomap.sh`) — cross-file relevance ranking for orientation: a
+  zero-dependency approximation of Aider's tree-sitter+PageRank repo map, using `grep`/`awk` to
+  extract import/require (JS/TS) and import/from (Python) statements and rank files by in-degree
+  (how many other files import them). Complements `quiet-map` (file-size/churn) and `quiet-outline`
+  (per-file signatures). Live A/B (`bench/repomap-orient.sh`, n=20/arm, Mann-Whitney U): surfacing
+  the ranking up front on an orientation task cut cost **76.8%** (p=5.1e-08) and turns **3.4→1.0**
+  (p=6.4e-08), both highly significant — the agent skips the `ls`/`grep`/`cat` exploration entirely
+  when the answer is already the top-ranked file. Full write-up in `bench/RESULTS.md` §
+  "quiet-repomap prototype." v1 scope: JS/TS + Python only, basename-matched import resolution (not
+  full module resolution) — documented limitation, not full Aider parity.
 - **JSON auto-stats (opt-in, `QUIET_JSON_AUTOSTATS=1`)** in `core/quiet-json.sh` — when a large
   JSON read's root is an array of uniform records, compute per-field stats (count/min/max/avg for
   numbers, distinct-count + top values for low-cardinality strings) over the **full** array, not
