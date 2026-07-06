@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.24.0] — 2026-07-06
+
 ### Changed
 - **`quiet_rewrite` now returns a one-line call to `core/qr.sh <mode> <cmd>` instead of an
   inline multi-line heredoc.** The mktemp/redirect/summarize logic that used to live in
