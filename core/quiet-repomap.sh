@@ -16,9 +16,11 @@
 # files look like one node). Complements quiet-map (file-size/churn/tree) and
 # quiet-outline (per-file signatures) rather than replacing them.
 #
-# Env: QUIET_REPOMAP_TOP (25).
+# Env: QUIET_REPOMAP_TOP (25), QUIET_REPOMAP_MAX_FILES (3000, caps the scan on
+# huge repos — deterministic prefix of `git ls-files`, not a random sample).
 
 TOP="${QUIET_REPOMAP_TOP:-25}"
+MAX_FILES="${QUIET_REPOMAP_MAX_FILES:-3000}"
 
 _filelist0() {
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -28,8 +30,10 @@ _filelist0() {
   fi
 }
 
-srcfiles=$(_filelist0 | tr '\0' '\n' | grep -E '\.(js|jsx|ts|tsx|mjs|cjs|py)$')
+srcfiles=$(_filelist0 | tr '\0' '\n' | grep -E '\.(js|jsx|ts|tsx|mjs|cjs|py)$' | head -n "$MAX_FILES")
 [ -n "$srcfiles" ] || { echo "[quiet-repomap] no JS/TS/Python source files found"; exit 0; }
+truncated=0
+[ "$(printf '%s\n' "$srcfiles" | wc -l | tr -d ' ')" -ge "$MAX_FILES" ] && truncated=1
 
 filelist=$(_filelist0 | tr '\0' '\n')
 
@@ -91,10 +95,11 @@ ranked=$(awk -F'\t' '
   END {
     for (f in indeg) printf "%d\t%s\n", indeg[f], f
   }
-' "$filelist_f" "$imports_f" | sort -t "$(printf '\t')" -k1,1rn | head -n "$TOP")
+' "$filelist_f" "$imports_f" | sort -t "$(printf '\t')" -k1,1rn -k2,2 | head -n "$TOP")
 
 [ -n "$ranked" ] || { echo "[quiet-repomap] no cross-file references resolved (all imports point outside the repo, or basenames didn't match)"; exit 0; }
 
 echo "[quiet-repomap] most-imported files (top $TOP by in-degree — how many other files import them):"
 printf '%s\n' "$ranked" | awk -F'\t' '{ printf "%6d  %s\n", $1, $2 }'
 echo "[quiet-repomap] Approximate (basename-matched imports, not full module resolution) — a proxy for \"start here,\" not ground truth."
+[ "$truncated" = 1 ] && echo "[quiet-repomap] scan capped at QUIET_REPOMAP_MAX_FILES=$MAX_FILES source files — ranking may be incomplete on this repo."

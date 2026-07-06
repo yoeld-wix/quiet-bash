@@ -44,7 +44,7 @@ It quiets the **four things that bloat an agent's context**:
 | **Read-to-find work** — locating, counting, extracting, verifying over files/logs | model reads the haystack into context | `deterministic-first` skill + `quiet-verify`/`quiet-agg` return just the answer |
 | **Repeated & blocking work** — re-reading unchanged files, judging logs, polling | model re-reads / re-judges / re-polls every turn | dedup of unchanged re-reads · `quiet-check` verdict+tally · `quiet-wait` one-shot poll |
 | **Lookups & archaeology** — config values, git history, recursive search | model reads whole files / scrolls full logs / floods on `grep -r` | `quiet-conf` · `quiet-hist`/`quiet-blame` · recursive `grep`/`rg` auto-collapsed |
-| **Orientation** — repo shape & toolchain | model explores with `ls`/`find`/reads, probes `node -v`/`which` | `quiet-map` (file-size/churn/tree map) · `quiet-env` (one-shot env digest) |
+| **Orientation** — repo shape, toolchain, and "what's central here" | model explores with `ls`/`find`/reads, probes `node -v`/`which` | `quiet-map` (file-size/churn/tree map) · `quiet-env` (one-shot env digest) · `quiet-repomap` (cross-file import-graph ranking, auto-surfaced at session start) |
 | **Diff apply & audit** — apply a patch, find more savings | re-emit whole files; brainstorm what to optimize | `quiet-applies`/`quiet-patch` (atomic git apply) · `bench/dfirst-audit.py` (mine transcripts for candidates) |
 
 ## Highlights
@@ -80,6 +80,7 @@ shell, see **[Install](#install)**.
   - [Output side: `minimal-change` skill](#output-side-minimal-change-skill)
   - [Output side: `minimal-docs` skill](#output-side-minimal-docs-skill)
   - [Prompt quieting (`quiet-prompt`)](#prompt-quieting-quiet-prompt)
+  - [Repo orientation (`quiet-repomap`)](#repo-orientation-quiet-repomap)
 - [Supported agents](#supported-agents)
 - [Install](#install)
 - [Configuration](#configuration)
@@ -446,6 +447,32 @@ prompt **~88–95%**. **Safe by default:** no `[ref]` tags (or a file under
 `--all` prints the full file; `--section` is byte-exact. Zero-dependency (bash + awk).
 The win is **cost + context headroom, not latency** — the injected prompt isn't the
 generation bottleneck.
+
+### Repo orientation (`quiet-repomap`)
+
+Dropped into an unfamiliar repo, an agent typically orients by exploring —
+`ls`/`find`/`grep -r`, reading a few files to guess what's central — burning
+several tool-call turns before it can act. `core/quiet-repomap.sh` is a
+zero-dependency approximation of Aider's tree-sitter+PageRank repo map: it
+greps import/require (JS/TS) and import/from (Python) statements, resolves
+each target to a repo file by basename match, and ranks files by **in-degree**
+— how many other files import them. On Claude Code it's auto-surfaced by a
+`SessionStart` hook (`adapters/claude-code-sessionstart.sh`), the same way
+`quiet-env`/`quiet-map` inform a session, disk-cached by repo path + git
+`HEAD` so repeat session starts on the same commit are a cache read, not a
+rescan.
+
+A live A/B (`bench/repomap-orient.sh`) measured this directly: on a
+"which file is most central" orientation task, an agent given the ranking up
+front answered in **1 turn every time**, versus a median of **3+ exploration
+turns** to reach the same answer cold — **76.8% cheaper** (p=5.1e-08),
+**turns 3.4→1.0** (p=6.4e-08), both highly significant at n=20, correctness
+~100% in both arms. Complements `quiet-map` (file-size/churn) and
+`quiet-outline` (per-file signatures) rather than replacing them. v1 scope:
+JS/TS + Python only, basename-matched import resolution (not full module
+resolution) — a documented approximation, not full Aider parity; a repo with
+duplicate basenames across directories will over/under-count. Full
+methodology in [`bench/RESULTS.md`](bench/RESULTS.md).
 
 ## Supported agents
 

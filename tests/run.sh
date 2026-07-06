@@ -854,6 +854,42 @@ ND=$(mktemp -d); ( cd "$ND" && git init -q >/dev/null && : > README.md && git ad
   | grep -q 'no JS/TS/Python source files found' && pass "quiet-repomap handles no-source-files repo" || bad "quiet-repomap empty repo"
 rm -rf "$ND"
 
+echo "== quiet-repomap SessionStart adapter (Claude Code) =="
+SSA="$ROOT/adapters/claude-code-sessionstart.sh"
+SST=$(mktemp -d); SSCACHE=$(mktemp -d)
+( cd "$SST" && git init -q && mkdir -p src
+  cat > src/logger.js <<'JS'
+export function log(m) { console.log(m); }
+JS
+  cat > src/a.js <<'JS'
+import { log } from './logger';
+JS
+  cat > src/b.js <<'JS'
+import { log } from './logger';
+JS
+  git add -A && git commit -qm init >/dev/null )
+ev=$(jq -n --arg cwd "$SST" '{cwd:$cwd, hook_event_name:"SessionStart", source:"startup"}')
+ssout=$(printf '%s' "$ev" | QUIET_LOG_DIR="$SSCACHE" "$SSA")
+printf '%s' "$ssout" | jq -e '.hookSpecificOutput.hookEventName == "SessionStart"' >/dev/null \
+  && pass "sessionstart adapter emits correct hookEventName" || bad "sessionstart hookEventName"
+printf '%s' "$ssout" | jq -r '.hookSpecificOutput.additionalContext' | grep -q 'logger.js' \
+  && pass "sessionstart adapter surfaces the ranking" || bad "sessionstart missing ranking"
+cache_file=$(find "$SSCACHE" -name '*.txt' | head -1)
+[ -n "$cache_file" ] && pass "sessionstart adapter writes a cache file" || bad "sessionstart cache missing"
+if [ -n "$cache_file" ]; then
+  printf '[quiet-repomap] most-imported files (CACHE-HIT-MARKER)' > "$cache_file"
+  ssout2=$(printf '%s' "$ev" | QUIET_LOG_DIR="$SSCACHE" "$SSA")
+  printf '%s' "$ssout2" | grep -q 'CACHE-HIT-MARKER' && pass "sessionstart adapter reuses cache on repeat call" || bad "sessionstart cache not reused"
+fi
+rm -rf "$SST" "$SSCACHE"
+# non-git dir and no-JS/Python-source repo -> silent no-op (no stdout)
+NG=$(mktemp -d)
+[ -z "$(jq -n --arg cwd "$NG" '{cwd:$cwd}' | "$SSA")" ] && pass "sessionstart adapter no-ops outside a git repo" || bad "sessionstart should no-op (non-git)"
+rm -rf "$NG"
+NS=$(mktemp -d); ( cd "$NS" && git init -q >/dev/null && : > README.md && git add -A && git commit -qm x >/dev/null )
+[ -z "$(jq -n --arg cwd "$NS" '{cwd:$cwd}' | QUIET_LOG_DIR="$(mktemp -d)" "$SSA")" ] && pass "sessionstart adapter no-ops with no JS/Python sources" || bad "sessionstart should no-op (no sources)"
+rm -rf "$NS"
+
 echo "== bench: enrichment grading =="
 . "$ROOT/bench/enrichment-tasks.sh"
 [ "$(fm_grade 0 'You would edit core/quiet-core.sh for that')" = pass ] && pass "fm_grade correct→pass" || bad "fm_grade correct"

@@ -30,6 +30,13 @@ All notable changes to this project are documented here. Format follows
   when the answer is already the top-ranked file. Full write-up in `bench/RESULTS.md` §
   "quiet-repomap prototype." v1 scope: JS/TS + Python only, basename-matched import resolution (not
   full module resolution) — documented limitation, not full Aider parity.
+- **`quiet-repomap` auto-surfaced on Claude Code** via a new `SessionStart` hook
+  (`adapters/claude-code-sessionstart.sh`, matcher `startup|clear`) — mirrors how the live A/B
+  above actually tested it (pre-surfaced, not a tool the agent has to discover and choose to run).
+  Disk-cached by repo path + git `HEAD` (`QUIET_LOG_DIR`, default `$TMPDIR`) so repeat session
+  starts on an unchanged commit are a cache read, not a rescan; scan itself is capped by
+  `QUIET_REPOMAP_MAX_FILES` (default 3000) for speed on large repos. Silent no-op outside a git
+  repo or when nothing resolves (non-JS/Python repos) — never injects a "nothing found" filler.
 - **JSON auto-stats (opt-in, `QUIET_JSON_AUTOSTATS=1`)** in `core/quiet-json.sh` — when a large
   JSON read's root is an array of uniform records, compute per-field stats (count/min/max/avg for
   numbers, distinct-count + top values for low-cardinality strings) over the **full** array, not
