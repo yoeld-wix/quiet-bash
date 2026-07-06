@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [1.25.0] — 2026-07-06
+
 ### Added
 - **`grepsearch` mode** in `core/qr.sh` for large `grep -r`/`rg` output (`docs/token-reduction-research.md`
   Tier 2 #4): replaces the old flat "first 40 lines" truncation with per-file match counts across
