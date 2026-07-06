@@ -640,7 +640,15 @@ echo "== cache-safety: rendered output is deterministic (never busts the prompt-
   s1=$(QUIET_RESULT_MIN_BYTES=5000 quiet_result_summarize "$big" "WebFetch" | mask)
   s2=$(QUIET_RESULT_MIN_BYTES=5000 quiet_result_summarize "$big" "WebFetch" | mask)
   [ "$s1" = "$s2" ] && pass "result summary identical modulo spill path (cache-safe)" || bad "result summary varies beyond spill path (cache risk)"
-  rm -rf "$QUIET_LOG_DIR"
+  # 4. grepsearch rendering is identical modulo the spill path (per-file counts,
+  # sort order, and truncation must not vary run-to-run on unchanged input)
+  GCS=$(mktemp -d)
+  for i in $(seq 1 70); do echo "needle $i" >> "$GCS/f.txt"; done
+  maskpath() { sed -E "s#${QUIET_LOG_PREFIX}[A-Za-z0-9]+#SPILL#g"; }
+  g1=$(cd "$GCS" && "$ROOT/core/qr.sh" grepsearch "grep -rn needle ." | maskpath)
+  g2=$(cd "$GCS" && "$ROOT/core/qr.sh" grepsearch "grep -rn needle ." | maskpath)
+  [ "$g1" = "$g2" ] && pass "grepsearch rendering identical modulo spill path (cache-safe)" || bad "grepsearch rendering varies beyond spill path (cache risk)"
+  rm -rf "$GCS" "$QUIET_LOG_DIR"
 )
 
 echo "== command-level dedup (repeat cat of an unchanged file) =="
@@ -1069,8 +1077,6 @@ printf '%s' "$out" | grep -qF '— grep it' && bad "content: ellipsis still has 
 echo "== qr.sh: search mode =="
 r=$(quiet_rewrite "ls -R /tmp")
 printf '%s' "$r" | grep -qF 'qr.sh search' && pass "search: ls -R routes to qr.sh search" || bad "search: ls -R routes to qr.sh search"
-r2=$(quiet_rewrite "grep -r foo .")
-printf '%s' "$r2" | grep -qF 'qr.sh search' && pass "search: grep -r routes to qr.sh search" || bad "search: grep -r routes to qr.sh search"
 r3=$(quiet_rewrite "npm ls")
 printf '%s' "$r3" | grep -qF 'qr.sh search' && pass "search: npm ls routes to qr.sh search" || bad "search: npm ls routes to qr.sh search"
 
@@ -1082,6 +1088,34 @@ out=$("$ROOT/core/qr.sh" search 'for i in $(seq 1 100); do echo "file_$i.txt"; d
   && printf '%s' "$out" | grep -qF 'locate: grep -n' \
   && printf '%s' "$out" | grep -qF 'tally: quiet-agg.sh'; } \
   && pass "search: large output uses new wording" || bad "search: large output uses new wording"
+
+echo "== qr.sh: grepsearch mode =="
+r2=$(quiet_rewrite "grep -r foo .")
+printf '%s' "$r2" | grep -qF 'qr.sh grepsearch' && pass "grepsearch: grep -r routes to qr.sh grepsearch" || bad "grepsearch: grep -r routing"
+r4=$(quiet_rewrite "rg foo .")
+printf '%s' "$r4" | grep -qF 'qr.sh grepsearch' && pass "grepsearch: rg routes to qr.sh grepsearch" || bad "grepsearch: rg routing"
+r5=$(quiet_rewrite "grep -c foo .")
+printf '%s' "$r5" | grep -qF 'qr.sh grepsearch' && bad "grepsearch: grep -c should pass through (already bounded)" || pass "grepsearch: grep -c passes through"
+
+GST=$(mktemp -d)
+mkdir -p "$GST/a" "$GST/b"
+for i in $(seq 1 40); do echo "needle line $i" >> "$GST/a/one.txt"; done
+for i in $(seq 1 25); do echo "needle line $i" >> "$GST/b/two.txt"; done
+long_line="needle $(python3 -c 'print("x"*400)' 2>/dev/null || printf 'x%.0s' $(seq 1 400))"
+echo "$long_line" >> "$GST/b/two.txt"
+gout=$(cd "$GST" && "$ROOT/core/qr.sh" grepsearch "grep -rn needle .")
+{ printf '%s' "$gout" | grep -qF 'matches across 2 files' \
+  && printf '%s' "$gout" | grep -qF 'top files by match count' \
+  && printf '%s' "$gout" | grep -qF './a/one.txt' \
+  && printf '%s' "$gout" | grep -qF 'sample matches'; } \
+  && pass "grepsearch: per-file counts + sample present" || bad "grepsearch: per-file counts + sample present"
+printf '%s' "$gout" | grep -qF '40  ./a/one.txt' && pass "grepsearch: per-file count is correct" || bad "grepsearch: per-file count wrong"
+sout=$("$ROOT/core/qr.sh" grepsearch "printf 'a:%s\n' \"$long_line\"; for i in \$(seq 1 65); do echo \"a:short \$i\"; done")
+printf '%s' "$sout" | grep -qF '…(truncated,' && pass "grepsearch: long match line gets truncated" || bad "grepsearch: long line not truncated"
+sout2=$("$ROOT/core/qr.sh" grepsearch 'echo one; echo two')
+{ printf '%s' "$sout2" | grep -qF 'one' && ! printf '%s' "$sout2" | grep -qF 'matches across'; } \
+  && pass "grepsearch: small output shown inline" || bad "grepsearch: small output shown inline"
+rm -rf "$GST"
 
 echo "== qr.sh: curl mode =="
 r=$(quiet_rewrite "curl https://example.com")

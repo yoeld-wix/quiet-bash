@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **`grepsearch` mode** in `core/qr.sh` for large `grep -r`/`rg` output (`docs/token-reduction-research.md`
+  Tier 2 #4): replaces the old flat "first 40 lines" truncation with per-file match counts across
+  **all** matched files (not just whichever sorted first), a few sample match lines, and long lines
+  capped (`QUIET_SEARCH_MAX_COLS`, default 300 cols) so one matched minified line can't dominate the
+  budget. Measured on a real repo-wide grep in this repo: **~47% smaller** (2,049 vs 3,856 bytes) than
+  the old approach, while surfacing all matched files instead of the 2–3 that happened to come first.
+  `ls -R`/`tree`/`find` listings are unchanged (still the simpler first-40+count collapse) — those are
+  plain filename lists, not per-match content, so the per-file-count problem doesn't apply. Lossless:
+  full matches stay on disk (`grep -n`/`quiet-agg.sh` pointers in the footer).
+
 ## [1.24.0] — 2026-07-06
 
 ### Changed

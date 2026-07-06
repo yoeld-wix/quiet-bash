@@ -25,6 +25,9 @@
 : "${QUIET_RESULT_MIN_BYTES:=${QUIET_MCP_MIN_BYTES:-25000}}" # summarize tool results larger than this
 : "${QUIET_OUTLINE_MIN_BYTES:=30000}"    # outline source files larger than this
 : "${QUIET_OUTLINE_MIN_SYMBOLS:=3}"      # below this many symbols, skip outlining
+: "${QUIET_SEARCH_TOP_FILES:=15}"        # grep/rg collapse: how many top-matching files to list
+: "${QUIET_SEARCH_SAMPLE_LINES:=10}"     # grep/rg collapse: how many sample match lines to show
+: "${QUIET_SEARCH_MAX_COLS:=300}"        # grep/rg collapse: truncate a sample line beyond this width
 
 # Absolute dir of this core (so quiet_rewrite can point at sibling scripts).
 QUIET_CORE_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || QUIET_CORE_DIR=.
@@ -213,9 +216,10 @@ quiet_rewrite() {
 
   # ── recursive-search path: grep -r / rg can flood context; VERBATIM-wrap ──
   # The command runs exactly as written (no flag rewrite → no changed match
-  # semantics); only a large RESULT is collapsed (spill + first-N + count +
-  # grep pointer), small results still show inline. Lossless. Only recursive
-  # searches (the flooding ones); bounded/piped/listing forms pass through.
+  # semantics); only a large RESULT is collapsed via an escalating summary
+  # (per-file match counts + a few sample lines, long lines capped), small
+  # results still show inline. Lossless. Only recursive searches (the flooding
+  # ones); bounded/piped/listing forms pass through.
   local grep_re='(^|[[:space:];&|(/])(grep|egrep|fgrep)[[:space:]]'
   local recflag_re='[[:space:]](-[A-Za-z]*[rR][A-Za-z]*|--recursive)([[:space:]]|$)'
   local rg_re='(^|[[:space:];&|(/])(rg|ripgrep)[[:space:]]'
@@ -224,7 +228,7 @@ quiet_rewrite() {
   if [[ $cmd != *'|'* && $cmd != *'>'* && $cmd != *'$('* && $cmd != *'`'* && $cmd != *-exec* ]] \
      && { { [[ $cmd =~ $grep_re ]] && [[ $cmd =~ $recflag_re ]]; } || [[ $cmd =~ $rg_re ]]; } \
      && ! [[ $cmd =~ $sbound_re ]]; then
-    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "search" "$cmd"
+    printf '%q %q %q' "${QUIET_CORE_DIR}/qr.sh" "grepsearch" "$cmd"
     return 0
   fi
 

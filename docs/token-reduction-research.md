@@ -99,7 +99,7 @@ collapse `\r`-overwritten progress/spinner lines to final state (lossless);
 - **Regression risk:** LOW for ANSI/`\r`; MEDIUM for Drain merge (tune similarity;
   full spill mitigates).
 
-### 4. Compact search-output ladder (grep / rg / find / ls -R)
+### 4. Compact search-output ladder (grep / rg / find / ls -R) — partially shipped
 New intercept class (passed through today). Large search output → collapse to a
 file-list + per-file counts with a drill-in to re-run with fuller flags. Escalating
 ladder: `-l` → `-c` → `-o` → `-C N` → full lines → Read range. `-M`/`--max-columns`
@@ -108,6 +108,23 @@ caps giant minified lines.
   Grep `head_limit`.
 - **Regression risk:** LOW–MEDIUM (counts lose match text; recoverable by re-run;
   keep above a threshold).
+
+> **Shipped (2026-07-06), the grep/rg half.** `core/qr.sh`'s new `grepsearch` mode
+> (routed from `grep -r`/`rg` in `core/quiet-core.sh`) replaces the old flat
+> "first 40 lines" truncation with per-file match counts across *all* matched
+> files (not just the first few in output order) + a few sample lines, long
+> lines capped at `QUIET_SEARCH_MAX_COLS` (default 300 cols) so one matched
+> minified line can't dominate the budget. Measured on a real repo-wide grep in
+> this repo: 2,049 bytes vs 3,856 for the old head-40 approach (**~47% smaller**)
+> while surfacing all 16 matched files instead of whichever 2–3 happened to sort
+> first. `ls -R`/`tree`/`find` listings are unchanged (still the simpler
+> first-40+count collapse via `search` mode) — those are plain filename lists,
+> not per-match content, so the per-file-count problem this candidate targets
+> doesn't apply there. The escalating-ladder (`-l`→`-c`→`-o`→`-C N`) and
+> `Read`-range drill-in ideas were not built — the per-file-count + capped-sample
+> approach covers the same need (which files, how many, what it looks like) in
+> one shot rather than requiring the agent to guess which re-run flag to try
+> next.
 
 ### 5. JSON minify always + templated record tables (never headerless CSV)
 - **Minify** structural whitespace first — fully lossless, **10–30%**; recovers

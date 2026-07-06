@@ -2,11 +2,12 @@
 #
 # qr — quiet-bash's runtime dispatcher for known-verbose command rewrites.
 #
-#   qr.sh generic <cmd>
-#   qr.sh git     <cmd> <summary-cmd>
-#   qr.sh content <cmd>
-#   qr.sh search  <cmd>
-#   qr.sh curl    <cmd>
+#   qr.sh generic    <cmd>
+#   qr.sh git        <cmd> <summary-cmd>
+#   qr.sh content    <cmd>
+#   qr.sh search     <cmd>
+#   qr.sh grepsearch <cmd>
+#   qr.sh curl       <cmd>
 #
 # quiet_rewrite (quiet-core.sh) used to return the mktemp/redirect/summarize
 # logic below as inline heredoc text — the full generated script became "the
@@ -17,8 +18,8 @@
 QRDIR="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$QRDIR/quiet-core.sh"
 
-mode="${1:?usage: qr.sh <generic|git|content|search|curl> <cmd> [summary-cmd]}"
-cmd="${2:?usage: qr.sh <generic|git|content|search|curl> <cmd> [summary-cmd]}"
+mode="${1:?usage: qr.sh <generic|git|content|search|grepsearch|curl> <cmd> [summary-cmd]}"
+cmd="${2:?usage: qr.sh <generic|git|content|search|grepsearch|curl> <cmd> [summary-cmd]}"
 
 case "$mode" in
 generic)
@@ -79,6 +80,34 @@ search)
   else
     echo "[${ln} lines -> ${log} | first ${QUIET_FAIL_TAIL_LINES} below; locate: grep -n '<pattern>' ${log} | tally: quiet-agg.sh ${log} '<pattern>']"
     head -n "${QUIET_FAIL_TAIL_LINES}" "$log"
+  fi
+  exit "$st"
+  ;;
+
+grepsearch)
+  # grep -r / rg output is "path:content" or "path:line:content" — the text
+  # before the FIRST colon is always the file path, so per-file match counts
+  # are one awk pass, no flag-parsing needed. Long lines (a matched minified
+  # single-line file) are capped so one match can't dominate the token budget.
+  log=$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
+  bash -c "$cmd" >"$log" 2>&1
+  st=$?
+  ln=$(wc -l <"$log" | tr -d ' ')
+  if [ "$ln" -le "${QUIET_INLINE_LINE_LIMIT}" ]; then
+    cat "$log"
+  else
+    counts=$(awk -F: '{print $1}' "$log" | sort | uniq -c | sort -rn)
+    nfiles=$(printf '%s\n' "$counts" | wc -l | tr -d ' ')
+    echo "[${ln} matches across ${nfiles} files -> ${log}]"
+    echo "[top files by match count:]"
+    printf '%s\n' "$counts" | head -n "${QUIET_SEARCH_TOP_FILES}" | awk '{printf "  %6s  %s\n", $1, $2}'
+    if [ "$nfiles" -gt "${QUIET_SEARCH_TOP_FILES}" ]; then
+      echo "  … $((nfiles - QUIET_SEARCH_TOP_FILES)) more files"
+    fi
+    echo "[sample matches (first ${QUIET_SEARCH_SAMPLE_LINES}, lines >${QUIET_SEARCH_MAX_COLS} cols truncated):]"
+    head -n "${QUIET_SEARCH_SAMPLE_LINES}" "$log" | awk -v m="${QUIET_SEARCH_MAX_COLS}" \
+      '{ if (length($0)>m) print substr($0,1,m) "…(truncated, " length($0) " chars)"; else print }'
+    echo "[full matches: grep -n '<pattern>' ${log} | tally by file: quiet-agg.sh ${log} '<pattern>' | narrow: re-run with -c or a specific path]"
   fi
   exit "$st"
   ;;

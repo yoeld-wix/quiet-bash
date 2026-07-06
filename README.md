@@ -244,7 +244,8 @@ map: [Comparison](docs/comparison.md).
 | **Large `*.json` / `*.yaml` reads** (`cat`/`bat`/`head`/`jq .`/`yq .` of a file > 25 KB) | Collapsed preview: repeated object/array shapes fold to `"N more of M, same shape"`, long strings truncated, + a `jq`/`yq` drill-in footer. File untouched on disk. |
 | **Large source files** (`cat`/`Read` of a `.py`/`.ts`/`.go`/`.rs`/`.java`/`.rb`/`.c`/… file > 30 KB) | Signature outline: imports + class/function/method signatures with bodies elided, each with the exact line range to expand (`Read <file> offset=S limit=N`). File untouched on disk. < 3 symbols → falls back to head/tail. |
 | **`gh` CI logs / PR diffs** (`gh run view … --log`, `gh pr diff`) | Full output spilled; head+tail preview + grep pointer. Content preserved on disk. Piped/redirected/`$(…)` forms pass through. |
-| **Recursive listings** (`ls -R`, `tree`, `find <path>`) | > 60 lines → first 40 + count + log path; full listing on disk. `find -exec`/`$(…)` and `grep`/`rg` left alone. |
+| **Recursive listings** (`ls -R`, `tree`, `find <path>`) | > 60 lines → first 40 + count + log path; full listing on disk. `find -exec`/`$(…)` pass through (not a listing). |
+| **Recursive search** (`grep -r`/`egrep`/`fgrep`, `rg`, without `-l`/`-c`/`-q`/a pipe/redirect) | > 60 lines → per-file match counts (all matched files, not just the first few) + a few sample lines, long lines truncated. Full matches on disk. Already-bounded forms (`-c`, `-l`, piped, `$(…)`) pass through unchanged. |
 | **`curl` responses** (`curl <url>`, not `-o`/`-I`/piped/`$(…)`) | > 25 KB → JSON collapses via the JSON preview (handles minified), else head+tail + log path. Small responses inline. Full body on disk. |
 | everything else (`ls`, `cat`, `grep`, `git status`, small `gh …`, …) | Passed through unchanged. |
 
