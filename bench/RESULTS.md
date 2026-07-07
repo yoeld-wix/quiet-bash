@@ -401,3 +401,32 @@ misattribute in a repo with duplicate basenames across directories); one
 model (Haiku); the task shape (a single orientation question, no downstream
 edit) is narrower than a full coding task. Reproduce: `bench/repomap-orient.sh`.
 Run: 2026-07-06.
+
+## C2 output-directive — 2026-07-07
+
+A/B: does prepending `output-styles/concise.md` to the system prompt reduce
+output tokens and cost on a mid-complexity coding task, with zero quality
+regression? Model: `claude-haiku-4-5`, n=20/arm, task: add a `--verbose` flag
+to a stub bash file, graded by file modification check. Arm B uses
+`--append-system-prompt` with the full text of `output-styles/concise.md`.
+
+```
+# Output-directive benchmark — mean per run
+| arm | cost $ | output tok | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no directive) | 0.0439 | 985 | 5.8 | 9/20 | 20 |
+| B concise (output-styles/concise.md) | 0.0403 | 777 | 5.0 | 11/20 | 20 |
+
+concise vs baseline: cost +8.2%, output tok +21.2% (positive=cheaper/fewer)
+Mann-Whitney U (cost): p=0.1685 not significant
+Fisher's exact (correctness): p=0.7524
+
+**Verdict: INCONCLUSIVE**
+```
+
+Direction is positive (concise arm is 8.2% cheaper, 21.2% fewer output tokens,
+0.8 fewer turns), but not statistically significant at n=20. Correctness is
+near-identical (9/20 vs 11/20, p=0.75 — the gap is noise). The low pass-rate
+(~50%) on both arms indicates the grading task (file modification check) is
+sensitive to model non-compliance on this simple stub rather than to the output
+style. Reproduce: `bench/output-directive.sh`. Run: 2026-07-07.
