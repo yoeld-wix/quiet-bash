@@ -473,3 +473,31 @@ task): a generic anti-preamble sentence appears not to reliably reduce output
 on well-scoped code-gen prompts. A stronger test would use an open-ended
 question task where the model is more likely to produce long preambles
 unprompted. Reproduce: `bench/anti-preamble.sh`. Run: 2026-07-08.
+
+## C6 cache-prefix health — 2026-07-08
+
+Does quiet-bash's hook rewriting (log redirect / value-folding) preserve or bust
+the cache prefix? Three arms: A baseline (no hooks), B cmd-only (PreToolUse Bash),
+C full (Bash + PostToolUse Read/MCP). Model: `claude-haiku-4-5`, 3 read-only git
+tasks (git log --oneline, git log --stat, git diff HEAD~3), n≈50/arm.
+PRIMARY METRIC: cache_read % (cache_read_tokens / total_input_tokens).
+
+```
+# Cache-prefix health check — mean per run
+| arm | cache_read % | cost $ | fresh in | cache_read | turns | runs |
+|---|--:|--:|--:|--:|--:|--:|
+| A baseline (no hooks) | 79.7% | 0.0400 | 19 | 69,163 | 2.8 | 50 |
+| B cmd-only (Bash) | 79.5% | 0.0397 | 19 | 68,051 | 2.8 | 51 |
+| C full (Bash + Read/MCP) | 78.6% | 0.0404 | 19 | 66,380 | 2.8 | 51 |
+
+B cmd-only (Bash) cache_read% vs baseline: +0.2pp — prefix PRESERVED (p>0.05, no significant bust)
+
+C full (Bash + Read/MCP) cache_read% vs baseline: +1.1pp — prefix PRESERVED (p>0.05, no significant bust)
+```
+
+**Verdict: prefix PRESERVED**
+
+Both hooked arms show no statistically significant reduction in cache_read % vs
+baseline (Mann-Whitney U, p>0.05 for both). The delta is ≤1.1pp and if anything
+slightly in baseline's favour — within noise. The hooks do not bust the cache
+prefix. Reproduce: `bench/cache-health.sh`. Run: 2026-07-08.
