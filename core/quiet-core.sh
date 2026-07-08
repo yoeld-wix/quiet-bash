@@ -177,12 +177,19 @@ quiet_rewrite() {
   # `[|]` is an unambiguous literal pipe in both grep -E and bash ERE.
   local limited_re='[-][-](stat|shortstat|numstat|name-only|name-status|oneline)|[|][[:space:]]*(head|tail|wc|grep|sed|awk)|>'
   if [[ $cmd =~ $git_re ]] && ! [[ $cmd =~ $limited_re ]]; then
-    local summary
+    local summary _hunk_only=""
     summary=$(printf '%s' "$cmd" | sed -E \
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)diff/\1git\2diff --stat/' \
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)show/\1git\2show --stat/' \
       -e 's/(^|[[:space:];&|(])git([[:space:]]+)log/\1git\2log --oneline/')
-    printf '%q %q %q %q' "${QUIET_CORE_DIR}/qr.sh" "git" "$cmd" "$summary"
+    # QUIET_DIFF_HUNK_ONLY=1 → strip context lines from inline view so the LLM
+    # sees only changed (+/-) lines and @@ headers; full diff stays on disk.
+    [ -n "${QUIET_DIFF_HUNK_ONLY:-}" ] && _hunk_only="--hunk-only"
+    if [ -n "$_hunk_only" ]; then
+      printf '%q %q %q %q %q' "${QUIET_CORE_DIR}/qr.sh" "git" "$cmd" "$summary" "$_hunk_only"
+    else
+      printf '%q %q %q %q' "${QUIET_CORE_DIR}/qr.sh" "git" "$cmd" "$summary"
+    fi
     return 0
   fi
 

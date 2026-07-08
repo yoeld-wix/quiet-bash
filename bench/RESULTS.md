@@ -1,3 +1,37 @@
+## C5 diff-hunk — 2026-07-08
+
+A/B: does stripping context lines (`QUIET_DIFF_HUNK_ONLY=1`) from a `git diff` reduce
+cost and turn count on a diff-inspection task, with no correctness loss?
+Arm A: no hook (full raw diff shown to model). Arm B: PreToolUse hook +
+`QUIET_DIFF_HUNK_ONLY=1` (context lines stripped, +/- lines and @@ headers only).
+Task: count changed files and identify the file with most lines added from
+`git diff HEAD~1 HEAD`. Ground truth: 4 files, most added = `session-brief.sh`.
+Model: `claude-haiku-4-5`, n=20/arm.
+
+```
+# Diff hunk-only benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (full diff) | 0.0438 | 21 | 5.2 | 2/20 | 20 |
+| B hunk-only (context stripped) | 0.0494 | 24 | 6.1 | 3/20 | 20 |
+
+hunk-only vs baseline: cost -12.8% (positive=cheaper)
+Mann-Whitney U (cost): p=0.8573 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: DO NOT SHIP**
+```
+
+Hunk-only mode added cost (+12.8%) and turns (+0.9) with no correctness improvement
+(2/20 → 3/20, p=1). Both arms had very low correctness, suggesting the task
+(counting files from raw diff output) is harder than the simple `--stat` format
+would make it. Stripping context lines removes cues the model may use to navigate
+the diff. Feature is implemented and tested but should not be enabled by default.
+The full diff on disk remains readable; agents can filter manually when desired.
+Reproduce: `QB_REPEATS=20 QB_PARALLEL=4 bench/diff-hunk.sh`. Run: 2026-07-08.
+
+---
+
 # quiet-bash benchmark — 2026-06-25T11:11Z
 
 | Layer (real input) | Without | With quiet-bash | Reduction |

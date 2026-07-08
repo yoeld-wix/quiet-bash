@@ -1158,5 +1158,28 @@ _brief_out=$(cd "$_tmp_git" && bash -c '
 if printf '%s' "$_brief_out" | grep -q "init"; then pass "session-brief: recent commit visible"; else bad "session-brief: missing recent commit"; fi
 rm -rf "$_tmp_git"
 
+echo "== core: diff hunk-only filter =="
+_sample_diff=$'diff --git a/f.sh b/f.sh\n--- a/f.sh\n+++ b/f.sh\n@@ -1,3 +1,3 @@\n-old line\n context\n+new line'
+_hunk_out=$(printf '%s' "$_sample_diff" | grep -v '^[[:space:]]')
+if printf '%s' "$_hunk_out" | grep -q "context"; then bad "hunk-only: context line leaked"; else pass "hunk-only: context lines stripped"; fi
+if printf '%s' "$_hunk_out" | grep -q "^+new line"; then pass "hunk-only: addition line kept"; else bad "hunk-only: addition line missing"; fi
+if printf '%s' "$_hunk_out" | grep -q "^-old line"; then pass "hunk-only: deletion line kept"; else bad "hunk-only: deletion line missing"; fi
+# quiet_rewrite should pass --hunk-only to qr.sh when QUIET_DIFF_HUNK_ONLY=1
+_rw_base=$(quiet_rewrite "git diff")
+_rw_hunk=$(QUIET_DIFF_HUNK_ONLY=1 quiet_rewrite "git diff")
+printf '%s' "$_rw_base" | grep -qF 'hunk-only' && bad "hunk-only: baseline should NOT include flag" || pass "hunk-only: baseline rewrite has no --hunk-only"
+printf '%s' "$_rw_hunk" | grep -qF 'hunk-only' && pass "hunk-only: rewrite with QUIET_DIFF_HUNK_ONLY=1 includes --hunk-only" || bad "hunk-only: rewrite missing --hunk-only"
+# integration: git diff in a tmp repo with QUIET_DIFF_HUNK_ONLY=1 strips context from inline output
+_hd=$(mktemp -d)
+( cd "$_hd" && git init -q && git config user.email t@t && git config user.name t \
+  && printf 'ctx1\nctx2\nold\n' > f.txt && git add f.txt && git commit -qm init \
+  && printf 'ctx1\nctx2\nnew\n' > f.txt )
+_out_base=$(cd "$_hd" && "$ROOT/core/qr.sh" git 'git diff' 'git diff --stat')
+_out_hunk=$(cd "$_hd" && "$ROOT/core/qr.sh" git 'git diff' 'git diff --stat' '--hunk-only')
+printf '%s' "$_out_base" | grep -q 'ctx' && pass "hunk-only: baseline shows context lines" || bad "hunk-only: baseline should show context"
+printf '%s' "$_out_hunk" | grep -q 'ctx' && bad "hunk-only: context leaked into hunk-only output" || pass "hunk-only: context absent from hunk-only output"
+printf '%s' "$_out_hunk" | grep -q '\-old' && pass "hunk-only: deletion present in hunk-only output" || bad "hunk-only: deletion missing"
+rm -rf "$_hd"
+
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }
