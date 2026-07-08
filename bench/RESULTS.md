@@ -535,3 +535,29 @@ the repomap-orient benchmark's "which file is most imported" task, where repomap
 turns from 3.4 to 1.0). The brief shipped regardless — it adds <100 bytes of
 orientation context at session start at near-zero cost. Reproduce:
 `bench/session-brief.sh`. Run: 2026-07-08.
+
+## C4 find-collapse — 2026-07-08
+
+A/B: does quiet-bash's PreToolUse Bash hook save cost when the agent runs
+`find . -name "*.sh"` on a 200-file fixture (5 dirs × 40 files)?
+
+Model: claude-haiku-4-5 | Repeats: 20/arm | Parallel: 4
+
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no hooks) | 0.0432 | 18 | 2.4 | 20/20 | 20 |
+| B wrapped (find collapse) | 0.0434 | 19 | 2.6 | 20/20 | 20 |
+
+wrapped vs baseline: cost -0.5% (positive=cheaper)
+Mann-Whitney U (cost): p=0.6723 not significant
+Fisher's exact (correctness): p=1.0000
+
+**Verdict: DO NOT SHIP** (no cost reduction; p=0.67, not significant)
+
+Finding: the find/ls wrapping produces no measurable cost saving on this task.
+Correctness is 20/20 on both arms (the task is easy enough that the model answers
+correctly regardless). The `input_tokens` (fresh) values are near-zero because
+Haiku caches the system prompt aggressively — the 200-path find output lands in
+cache, so collapsing it saves no fresh tokens in this configuration. The wrapping
+is not harmful (correctness preserved, cost within noise), but this bench finds
+no positive signal. Reproduce: `bench/find-collapse.sh`.
