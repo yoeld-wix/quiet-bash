@@ -1,3 +1,52 @@
+## C8 selective-downgrade — 2026-07-08
+
+A/B: does selectively setting `CLAUDE_CODE_SUBAGENT_MODEL=claude-haiku-4-5` on the
+selective arm (simulating downgrade of search/grep/read subagents only) save cost
+with zero correctness regression vs baseline (subagents inherit main model)?
+Model: `claude-haiku-4-5` for both arms (QB_MODEL=claude-haiku-4-5). SUBMODEL also
+`claude-haiku-4-5` — so the selective arm sets the env var to the same model as the
+main loop. This means no true model downgrade occurs; the bench measures env-var
+overhead and run-to-run noise rather than a price-tier difference.
+Tasks: 4 read-only queries (current branch, core .sh count, QUIET_LOG_PREFIX value,
+3 most-recently-modified files). Ground truth: crocus-whippet, 21, claude-cmd-.
+Model: `claude-haiku-4-5`, n=20 reps × 4 tasks = 80 runs/arm, parallel=4.
+
+```
+# Selective model downgrade benchmark — mean per run
+| arm | cost $ | output tok | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (inherit model) | 0.0167 | 382 | 1.0 | 20/80 | 80 |
+| B selective (search agents → haiku) | 0.0186 | 409 | 1.0 | 20/80 | 80 |
+
+selective vs baseline: cost -11.4% (positive=cheaper)
+Mann-Whitney U (cost): p=0.9362 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: DO NOT SHIP**
+```
+
+Both arms ran in exactly 1.0 turns — the model answered all tasks without spawning
+any subagents, so `CLAUDE_CODE_SUBAGENT_MODEL` was never consulted. This is the same
+design flaw as C1 session-brief: tasks answerable in 1 turn produce zero delegation
+opportunity. Correctness was 20/80 for both arms: task 3 (most-recently-modified
+files, truth="") always passed (20/20); tasks 0-2 all failed (0/60) because the
+model answered from training data without using Bash/Read tools, so it guessed
+wrong on git branch, .sh count, and QUIET_LOG_PREFIX. The selective arm was
+directionally 11.4% MORE expensive than baseline (p=0.94, not significant) — this
+is pure run-to-run variance, not a feature effect, since both arms used identical
+models.
+
+**Limitation:** because QB_MODEL=QB_SUBMODEL=claude-haiku-4-5, there is no actual
+price-tier difference between arms. A meaningful selective-downgrade bench requires
+QB_MODEL=claude-sonnet-4-5 with QB_SUBMODEL=claude-haiku-4-5, AND tasks that induce
+multi-turn tool use (so subagents actually get spawned). This bench is a structural
+null result — it measures nothing about selective downgrade and everything about
+task design. Reproduce:
+`QB_TARGET="$PWD" QB_MODEL=claude-haiku-4-5 QB_REPEATS=20 QB_PARALLEL=4 bench/model-economy-selective.sh`.
+Run: 2026-07-08.
+
+---
+
 ## C7 injection-placement — 2026-07-08
 
 A/B: does placing the repomap injection as a first-turn user message (injected once)
