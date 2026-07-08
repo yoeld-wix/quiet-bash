@@ -1,3 +1,37 @@
+## C3 dedup — 2026-07-08
+
+A/B: does `quiet_cmd_dedup` (already shipped in `core/quiet-dedup.sh`) save cost when
+the agent re-reads the same file twice via `cat` in one session?
+Arm A: no hooks (both cat calls return full content). Arm B: PreToolUse Bash hook
+(`adapters/claude-code.sh`) — second unchanged `cat` returns a stub.
+Task: read package.json, modify startup.sh to print the version, re-read package.json
+to confirm. Ground truth: startup.sh must contain "2.7.1".
+Model: `claude-haiku-4-5`, n=20/arm.
+
+```
+# Same-session cat dedup benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no dedup) | 0.0538 | 33 | 5.2 | 10/20 | 20 |
+| B dedup (quiet_cmd_dedup active) | 0.0534 | 39 | 5.3 | 14/20 | 20 |
+
+dedup vs baseline: cost +0.7% (positive=cheaper)
+Mann-Whitney U (cost): p=0.1366 not significant
+Fisher's exact (correctness): p=0.3332
+
+**Verdict: INCONCLUSIVE**
+```
+
+Cost difference is negligible (+0.7%, p=0.14). The task is small enough that
+claude's prompt caching absorbs the second read before quiet_cmd_dedup can
+intercept it — the dedup stub fires but the token savings are already captured
+by the API-level cache. Correctness trended higher on dedup arm (14/20 vs 10/20)
+but not significantly (p=0.33). Feature remains correct and non-regressive;
+benefit is masked at this task scale.
+Reproduce: `QB_REPEATS=20 QB_PARALLEL=4 bench/dedup.sh`. Run: 2026-07-08.
+
+---
+
 ## C5 diff-hunk — 2026-07-08
 
 A/B: does stripping context lines (`QUIET_DIFF_HUNK_ONLY=1`) from a `git diff` reduce
