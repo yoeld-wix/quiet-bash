@@ -64,6 +64,9 @@ sys.stdout.write(json.dumps(rec)+chr(10))
 
 echo "model=$MODEL submodel=$SUBMODEL repeats=$REPEATS target=$TARGET" >&2
 
+# Warmup run (baseline, no output captured) to prime the cache prefix
+run_one warmup 0 0 0 /dev/null
+
 export -f run_one
 export TARGET MODEL SUBMODEL OUT
 export T0="${TASKS[0]}" T1="${TASKS[1]}" T2="${TASKS[2]}" T3="${TASKS[3]}"

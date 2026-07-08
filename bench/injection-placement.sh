@@ -40,7 +40,7 @@ run_one() { # arm use_system rep [jobfile]
 
   for i in 0 1 2 3 4; do
     local prompt="${turns[$i]}"
-    local j extra_args=()
+    local j
     if [ "$i" = "0" ] && [ "$use_sys" = "0" ]; then
       # first-turn arm: prepend injection to first user message only
       prompt="$INJECTION
@@ -48,12 +48,15 @@ run_one() { # arm use_system rep [jobfile]
 $prompt"
     fi
     if [ "$use_sys" = "1" ]; then
-      extra_args=(--append-system-prompt "$INJECTION")
+      j=$(cd "$TARGET" && timeout 90 claude -p "$prompt" \
+            --model "$MODEL" --output-format json \
+            --append-system-prompt "$INJECTION" \
+            --allowedTools "Bash" "Read" 2>/dev/null)
+    else
+      j=$(cd "$TARGET" && timeout 90 claude -p "$prompt" \
+            --model "$MODEL" --output-format json \
+            --allowedTools "Bash" "Read" 2>/dev/null)
     fi
-    j=$(cd "$TARGET" && timeout 90 claude -p "$prompt" \
-          --model "$MODEL" --output-format json \
-          "${extra_args[@]}" \
-          --allowedTools "Bash" "Read" 2>/dev/null)
     [ -z "$j" ] && { ok=0; break; }
     local turn_cost
     turn_cost=$(printf '%s' "$j" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_cost_usd',0))" 2>/dev/null)

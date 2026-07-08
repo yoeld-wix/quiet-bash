@@ -6,7 +6,7 @@
 #   B current         — collapse at QUIET_RESULT_MIN_BYTES default (25000)
 #   C aggressive      — collapse at half the default (12500)
 #
-# Task: fetch a small public page (httpbin.org/json) and answer a question
+# Task: fetch the jq README from raw.githubusercontent.com and answer a question
 # about it — this is a controlled, reproducible WebFetch target.
 #
 # NOTE: This bench requires network access. Results are env-dependent (latency,

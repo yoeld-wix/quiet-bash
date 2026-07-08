@@ -17,7 +17,7 @@ Token cost in an agentic session is noisy. Run-to-run variance is typically 60% 
 
 ```
 total_cost = (fresh_input × rate)
-           + (output × ~3× rate)
+           + (output × ~5× rate)
            + (cache_creation × 1.25× rate)
            + (cache_read × 0.1× rate)
            + turns × transcript_regrowth

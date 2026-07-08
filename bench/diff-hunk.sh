@@ -28,8 +28,8 @@ TASK='Run: git diff HEAD~1 HEAD   then tell me: (1) how many files changed, (2) 
 N_FILES=$(git -C "$ROOT" diff --stat HEAD~1 HEAD 2>/dev/null | tail -1 | grep -oE '[0-9]+ file' | grep -oE '[0-9]+')
 MOST_ADDED=$(git -C "$ROOT" diff --stat HEAD~1 HEAD 2>/dev/null | grep '|' | sort -t'|' -k2 -rn | head -1 | awk '{print $1}' | xargs basename 2>/dev/null || echo "")
 
-run_one() { # arm settings hunk_only rep
-  local arm="$1" set="$2" hunk="$3" rep="$4"
+run_one() { # arm settings hunk_only rep [jobfile]
+  local arm="$1" set="$2" hunk="$3" rep="$4" jobfile="${5:-}"
   local j
   j=$(cd "$TARGET" && QUIET_DIFF_HUNK_ONLY="$hunk" timeout 120 claude -p "$TASK" \
         --model "$MODEL" --output-format json --settings "$set" \
@@ -38,6 +38,7 @@ run_one() { # arm settings hunk_only rep
   local result ok=0
   result=$(printf '%s' "$j" | python3 -c "import sys,json; print(json.load(sys.stdin).get('result',''))" 2>/dev/null)
   printf '%s' "$result" | grep -qi "FILES: $N_FILES" && ok=1
+  local dest="${jobfile:-$OUT}"
   printf '%s\n' "$j" | python3 -c "
 import sys,json
 o=json.load(sys.stdin)
@@ -48,12 +49,12 @@ rec={'arm':'$arm','rep':$rep,
      'cost':o.get('total_cost_usd',0),'turns':o.get('num_turns',0),
      'ok': $ok}
 sys.stdout.write(json.dumps(rec)+chr(10))
-" >> "$OUT"
+" > "$dest"
   echo "  ✓ ${arm} rep${rep}" >&2
 }
 
 echo "model=$MODEL repeats=$REPEATS n_files=$N_FILES most_added=$MOST_ADDED" >&2
-run_one warmup "$BASE_SET" 0 0
+run_one warmup "$BASE_SET" 0 0 /dev/null
 
 export -f run_one
 export TARGET MODEL TASK BASE_SET HUNK_SET N_FILES MOST_ADDED OUT
@@ -62,8 +63,10 @@ for rep in $(seq 1 "$REPEATS"); do
   printf 'baseline  %s 0 %s\n' "$BASE_SET" "$rep" >> "$JOBLIST"
   printf 'hunk-only %s 1 %s\n' "$HUNK_SET" "$rep" >> "$JOBLIST"
 done
-xargs -P "$PARALLEL" -n 4 bash -c 'run_one "$1" "$2" "$3" "$4"' _ < "$JOBLIST"
-rm -f "$JOBLIST" "$BASE_SET" "$HUNK_SET"
+xargs -P "$PARALLEL" -n 4 bash -c 'run_one "$1" "$2" "$3" "$4" "$OUT.job.$1.$4"' _ < "$JOBLIST"
+rm -f "$JOBLIST"
+cat "$OUT".job.* > "$OUT" 2>/dev/null
+rm -f "$OUT".job.* "$BASE_SET" "$HUNK_SET"
 
 echo >&2
 python3 - "$OUT" <<'PY'
