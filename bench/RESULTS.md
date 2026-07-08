@@ -436,3 +436,40 @@ a wash (−1.8%, p=0.80, not significant), output tokens barely differ (3.8% few
 for concise), and turns are equal (3.5 each). The concise directive has no
 demonstrated effect on cost or output volume on this task shape. Reproduce:
 `bench/output-directive.sh`. Run: 2026-07-08.
+
+## C10 anti-preamble — 2026-07-08
+
+A/B: does a minimal "no preamble, no postamble" one-sentence directive reduce
+output tokens on a pure code-generation task (write a `count_lines` bash
+function), without affecting correctness? Model: `claude-haiku-4-5`, n=20/arm,
+no tools (`--allowedTools ""`). Arm B uses `--append-system-prompt` with one
+sentence telling the model to skip acknowledgment and closing remarks.
+
+```
+# Anti-preamble directive benchmark — mean per run
+| arm | cost $ | output tok | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no directive) | 0.0258 | 569 | 1.0 | 20/20 | 20 |
+| B anti-preamble (directive) | 0.0267 | 527 | 1.0 | 20/20 | 20 |
+
+anti-preamble vs baseline: output tok +7.4%, cost -3.2% (positive=fewer/cheaper)
+Mann-Whitney U (output tok): p=0.3934 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: INCONCLUSIVE**
+```
+
+Output tokens trended 7.4% lower for the directive arm (569 → 527 mean), but
+the Mann-Whitney test returned p=0.39 — not significant. Correctness was 20/20
+on both arms (p=1). Turns were exactly 1.0 for both (single-shot generation,
+no tool calls), so this is a clean measurement with no turn-count confound.
+
+The direction is right (fewer output tokens with the directive) but the effect
+is too small and too noisy to reach significance at n=20. On a 1-turn pure-text
+task the model already tends toward concise function-only output, leaving little
+room for the directive to bite. The INCONCLUSIVE verdict here is consistent with
+the C2 output-directive result (also DO NOT SHIP / INCONCLUSIVE on a coding
+task): a generic anti-preamble sentence appears not to reliably reduce output
+on well-scoped code-gen prompts. A stronger test would use an open-ended
+question task where the model is more likely to produce long preambles
+unprompted. Reproduce: `bench/anti-preamble.sh`. Run: 2026-07-08.
