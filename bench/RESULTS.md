@@ -1,3 +1,37 @@
+## C7 injection-placement — 2026-07-08
+
+A/B: does placing the repomap injection as a first-turn user message (injected once)
+vs as `--append-system-prompt` (re-sent every turn) reduce cumulative cost across a
+5-turn session? Arm A: system-prompt (`--append-system-prompt INJECTION` on every call).
+Arm B: first-turn (INJECTION prepended to the first user message only, no system arg).
+Each rep is 5 independent `-p` calls (simulating 5 turns). INJECTION is the output of
+`core/quiet-repomap.sh` on this repo. Model: `claude-haiku-4-5`, n=10/arm.
+
+```
+# Injection placement benchmark — cumulative 5-turn cost per rep
+| arm | cost $ (5-turn total) | runs |
+|---|--:|--:|
+| A system-prompt (re-sent every turn) | 0.1825 | 10 |
+| B first-turn (injected once) | 0.1846 | 10 |
+
+first-turn vs system-prompt: cost -1.1% (positive=cheaper)
+Mann-Whitney U: p=0.7397 not significant
+
+**Verdict: DO NOT SHIP**
+```
+
+System-prompt arm is directionally cheaper (0.1825 vs 0.1846, −1.1%), but the
+difference is tiny and not significant (p=0.74). This is the expected result:
+because these are independent `-p` calls (not a real `--continue` multi-turn
+session), the system-prompt is not literally re-sent across turns — both arms
+incur essentially the same token load per call. The "system-prompt overhead" only
+materialises in a real multi-turn conversation where the system prompt is prepended
+to every assistant turn in the context window. On independent calls, the two arms
+are mechanically equivalent, and the noise dominates. Reproduce:
+`QB_REPEATS=10 QB_PARALLEL=2 bench/injection-placement.sh`. Run: 2026-07-08.
+
+---
+
 ## C3 dedup — 2026-07-08
 
 A/B: does `quiet_cmd_dedup` (already shipped in `core/quiet-dedup.sh`) save cost when
