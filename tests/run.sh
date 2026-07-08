@@ -895,7 +895,12 @@ NG=$(mktemp -d)
 [ -z "$(jq -n --arg cwd "$NG" '{cwd:$cwd}' | "$SSA")" ] && pass "sessionstart adapter no-ops outside a git repo" || bad "sessionstart should no-op (non-git)"
 rm -rf "$NG"
 NS=$(mktemp -d); ( cd "$NS" && git init -q >/dev/null && : > README.md && git add -A && git commit -qm x >/dev/null )
-[ -z "$(jq -n --arg cwd "$NS" '{cwd:$cwd}' | QUIET_LOG_DIR="$(mktemp -d)" "$SSA")" ] && pass "sessionstart adapter no-ops with no JS/Python sources" || bad "sessionstart should no-op (no sources)"
+_nsout=$(jq -n --arg cwd "$NS" '{cwd:$cwd}' | QUIET_LOG_DIR="$(mktemp -d)" "$SSA")
+# now emits a brief even with no JS/Python sources; repomap block must be absent
+printf '%s' "$_nsout" | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null | grep -q 'Project brief' \
+  && pass "sessionstart adapter emits brief even with no JS/Python sources" || bad "sessionstart should emit brief (no sources)"
+printf '%s' "$_nsout" | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null | grep -q 'most-imported' \
+  && bad "sessionstart should NOT include repomap block when no sources" || pass "sessionstart no-sources: repomap block absent"
 rm -rf "$NS"
 
 echo "== bench: enrichment grading =="
@@ -1137,6 +1142,21 @@ out=$(QUIET_JSON_MIN_BYTES=10 "$ROOT/core/qr.sh" curl 'printf "%s" "{\"items\": 
 
 out=$("$ROOT/core/qr.sh" curl 'echo small-body')
 [ "$out" = "small-body" ] && pass "curl: small body shown inline" || bad "curl: small body shown inline"
+
+echo "== sessionstart: brief block =="
+# Smoke test: brief_block outputs branch + recent commits in a temp git repo
+_tmp_git=$(mktemp -d)
+(cd "$_tmp_git" && git init -q && git commit --allow-empty -m "init" --author="t <t@t>" 2>/dev/null)
+_brief_out=$(cd "$_tmp_git" && bash -c '
+  ROOT='"$ROOT"'
+  cwd="$PWD"
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+  brief_branch=$(git branch --show-current 2>/dev/null)
+  brief_log=$(git log --oneline -5 2>/dev/null)
+  printf "%s\n%s\n" "$brief_branch" "$brief_log"
+')
+if printf '%s' "$_brief_out" | grep -q "init"; then pass "session-brief: recent commit visible"; else bad "session-brief: missing recent commit"; fi
+rm -rf "$_tmp_git"
 
 echo
 [ "$fail" -eq 0 ] && { echo "ALL TESTS PASSED"; exit 0; } || { echo "TESTS FAILED"; exit 1; }

@@ -501,3 +501,37 @@ Both hooked arms show no statistically significant reduction in cache_read % vs
 baseline (Mann-Whitney U, p>0.05 for both). The delta is ≤1.1pp and if anything
 slightly in baseline's favour — within noise. The hooks do not bust the cache
 prefix. Reproduce: `bench/cache-health.sh`. Run: 2026-07-08.
+
+## C1 session-brief — 2026-07-08
+
+A/B: does injecting a project brief (branch + recent commits) at session start
+save exploration turns and cost on an orientation task? Model: `claude-haiku-4-5`,
+n=20/arm. Arm B receives branch name + 5 recent commit messages prepended to the
+task (simulating what the SessionStart hook injects). Task: identify the current
+branch and most recent commit message. Graded correct if output contains both.
+
+```
+# Session-brief benchmark — mean per run
+| arm | cost $ | turns | output tok | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (cold) | 0.0242 | 1.0 | 162 | 20/20 | 20 |
+| B brief (pre-surfaced) | 0.0238 | 1.0 | 159 | 20/20 | 20 |
+
+brief vs baseline: cost +1.7%, turns 1.0 -> 1.0
+Mann-Whitney U (cost): p=0.8103 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: INCONCLUSIVE**
+```
+
+Both arms answered in exactly 1.0 turns (no tool calls needed) — the task was too
+easy. `--allowedTools "Bash"` was set but the model answered from training knowledge
+/ the task text itself, so there was no turn-reduction opportunity for the brief to
+exploit. Cost and output tokens are within noise (p=0.81). Correctness was 20/20
+for both. The design flaw: a question the model can answer without any tool calls
+produces no turn differential regardless of pre-surfaced context. The session-brief
+feature is expected to pay off on tasks that *require* file/git exploration (like
+the repomap-orient benchmark's "which file is most imported" task, where repomap cut
+turns from 3.4 to 1.0). The brief shipped regardless — it adds <100 bytes of
+orientation context at session start at near-zero cost. Reproduce:
+`bench/session-brief.sh`. Run: 2026-07-08.
