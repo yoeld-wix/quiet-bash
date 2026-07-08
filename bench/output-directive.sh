@@ -7,7 +7,7 @@
 #   B concise  — system prompt includes output-styles/concise.md verbatim
 #
 # Usage: QB_MODEL=claude-haiku-4-5 QB_REPEATS=20 QB_PARALLEL=4 bench/output-directive.sh
-set -uo pipefail
+set -euo pipefail
 ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 MODEL="${QB_MODEL:-claude-haiku-4-5}"
 REPEATS="${QB_REPEATS:-20}"
@@ -18,46 +18,41 @@ rm -f "$OUT".job.*
 
 CONCISE_MD="$(cat "$ROOT/output-styles/concise.md")"
 
-TARGET="$(mktemp -d)"
-# Minimal fixture: a bash file missing a --verbose flag
-cat > "$TARGET/quiet-map-stub.sh" <<'STUB'
-#!/usr/bin/env bash
-# stub for bench
-echo "map output"
-STUB
-
 TASK='Add a --verbose flag to quiet-map-stub.sh: when passed, print "verbose mode on" before the normal output. Update the file in place.'
-
-grade() { # result_text
-  # Pass if the file contains --verbose handling
-  grep -q '\-\-verbose\|verbose' "$TARGET/quiet-map-stub.sh" 2>/dev/null && echo "1" || echo "0"
-}
 
 run_one() { # arm concise rep [jobfile]
   local arm="$1" use_concise="$2" rep="$3" jobfile="${4:-}"
   local extra_system=""
   [ "$use_concise" = "1" ] && extra_system="$CONCISE_MD"
 
-  # Reset fixture each run
-  cat > "$TARGET/quiet-map-stub.sh" <<'STUB'
+  # Each parallel job gets its own isolated directory
+  local tgt; tgt=$(mktemp -d)
+
+  # Write the initial fixture into $tgt/
+  cat > "$tgt/quiet-map-stub.sh" <<'STUB'
 #!/usr/bin/env bash
 echo "map output"
 STUB
 
   local j
   if [ -n "$extra_system" ]; then
-    j=$(cd "$TARGET" && timeout 120 claude -p "$TASK" \
+    j=$(cd "$tgt" && timeout 120 claude -p "$TASK" \
           --model "$MODEL" --output-format json \
           --append-system-prompt "$extra_system" \
           --allowedTools "Bash" "Edit" "Write" "Read" 2>/dev/null)
   else
-    j=$(cd "$TARGET" && timeout 120 claude -p "$TASK" \
+    j=$(cd "$tgt" && timeout 120 claude -p "$TASK" \
           --model "$MODEL" --output-format json \
           --allowedTools "Bash" "Edit" "Write" "Read" 2>/dev/null)
   fi
-  [ -z "$j" ] && { echo "  ! ${arm} rep${rep}: no output" >&2; return; }
+  if [ -z "$j" ]; then
+    echo "  ! ${arm} rep${rep}: no output" >&2
+    rm -rf "$tgt"
+    return
+  fi
   local ok
-  ok=$(grade "")
+  # Grade by checking $tgt/quiet-map-stub.sh
+  grep -q '\-\-verbose\|verbose' "$tgt/quiet-map-stub.sh" 2>/dev/null && ok=1 || ok=0
   local dest="${jobfile:-$OUT}"
   printf '%s\n' "$j" | python3 -c "
 import sys,json
@@ -72,13 +67,14 @@ rec={'arm':'$arm','rep':$rep,
 sys.stdout.write(json.dumps(rec)+chr(10))
 " > "$dest"
   echo "  ✓ ${arm} rep${rep}" >&2
+  rm -rf "$tgt"
 }
 
 echo "model=$MODEL repeats=$REPEATS parallel=$PARALLEL" >&2
 run_one warmup 0 0 /dev/null
 
-export -f run_one grade
-export TARGET TASK MODEL CONCISE_MD OUT
+export -f run_one
+export TASK MODEL CONCISE_MD OUT
 JOBLIST="$(mktemp)"
 for rep in $(seq 1 "$REPEATS"); do
   printf 'baseline 0 %s\n' "$rep" >> "$JOBLIST"
@@ -88,7 +84,6 @@ xargs -P "$PARALLEL" -n 3 bash -c 'run_one "$1" "$2" "$3" "$OUT.job.$1.$3"' _ < 
 rm -f "$JOBLIST"
 cat "$OUT".job.* > "$OUT" 2>/dev/null
 rm -f "$OUT".job.*
-rm -rf "$TARGET"
 
 echo >&2
 python3 - "$OUT" <<'PY'

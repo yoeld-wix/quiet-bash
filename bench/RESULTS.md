@@ -402,7 +402,13 @@ model (Haiku); the task shape (a single orientation question, no downstream
 edit) is narrower than a full coding task. Reproduce: `bench/repomap-orient.sh`.
 Run: 2026-07-06.
 
-## C2 output-directive — 2026-07-07
+## C2 output-directive — 2026-07-08 (corrected)
+
+**Correction (2026-07-08):** The 2026-07-07 result (9/20 and 11/20 correctness,
+INCONCLUSIVE) was **invalid** — caused by a parallel fixture race: all jobs shared
+one `$TARGET` directory, so concurrent runs corrupted each other's `quiet-map-stub.sh`
+before grading. Fix: fixture creation moved inside `run_one` so each parallel job
+gets its own isolated `mktemp -d`. Rerun below supersedes the original.
 
 A/B: does prepending `output-styles/concise.md` to the system prompt reduce
 output tokens and cost on a mid-complexity coding task, with zero quality
@@ -414,19 +420,19 @@ to a stub bash file, graded by file modification check. Arm B uses
 # Output-directive benchmark — mean per run
 | arm | cost $ | output tok | turns | correct | runs |
 |---|--:|--:|--:|--:|--:|
-| A baseline (no directive) | 0.0439 | 985 | 5.8 | 9/20 | 20 |
-| B concise (output-styles/concise.md) | 0.0403 | 777 | 5.0 | 11/20 | 20 |
+| A baseline (no directive) | 0.0488 | 609 | 3.5 | 20/20 | 20 |
+| B concise (output-styles/concise.md) | 0.0497 | 585 | 3.5 | 20/20 | 20 |
 
-concise vs baseline: cost +8.2%, output tok +21.2% (positive=cheaper/fewer)
-Mann-Whitney U (cost): p=0.1685 not significant
-Fisher's exact (correctness): p=0.7524
+concise vs baseline: cost -1.8%, output tok +3.8% (positive=cheaper/fewer)
+Mann-Whitney U (cost): p=0.7953 not significant
+Fisher's exact (correctness): p=1
 
-**Verdict: INCONCLUSIVE**
+**Verdict: DO NOT SHIP**
 ```
 
-Direction is positive (concise arm is 8.2% cheaper, 21.2% fewer output tokens,
-0.8 fewer turns), but not statistically significant at n=20. Correctness is
-near-identical (9/20 vs 11/20, p=0.75 — the gap is noise). The low pass-rate
-(~50%) on both arms indicates the grading task (file modification check) is
-sensitive to model non-compliance on this simple stub rather than to the output
-style. Reproduce: `bench/output-directive.sh`. Run: 2026-07-07.
+Correctness is now 20/20 on both arms — the prior ~50% pass-rate was entirely the
+race condition, not model non-compliance. With valid isolation: cost is essentially
+a wash (−1.8%, p=0.80, not significant), output tokens barely differ (3.8% fewer
+for concise), and turns are equal (3.5 each). The concise directive has no
+demonstrated effect on cost or output volume on this task shape. Reproduce:
+`bench/output-directive.sh`. Run: 2026-07-08.
