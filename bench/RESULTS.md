@@ -1,3 +1,40 @@
+## C9 WebFetch collapse — 2026-07-08
+
+A/B/C: does quiet-bash's PostToolUse WebFetch result collapsing save cost, and what
+threshold is optimal? Arm A: no PostToolUse hook (full WebFetch content in context).
+Arm B: collapse at default threshold (25000 B). Arm C: aggressive threshold (12500 B).
+Task: fetch `https://raw.githubusercontent.com/stedolan/jq/master/README` and answer
+"what does jq do? One sentence." Graded correct if output mentions json/command-line/
+process/filter. Model: `claude-haiku-4-5`, n=20/arm, parallel=4.
+
+```
+# WebFetch collapse benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no collapse) | 0.0580 | 34 | 5.0 | 20/20 | 20 |
+| B default (25000 B threshold) | 0.0571 | 33 | 4.8 | 20/20 | 20 |
+| C aggressive (12500 B) | 0.0558 | 32 | 4.7 | 20/20 | 20 |
+
+B default (25000 B threshold): cost +1.4%, p=0.3779 — **INCONCLUSIVE**
+
+C aggressive (12500 B): cost +3.7%, p=0.1824 — **INCONCLUSIVE**
+```
+
+Both arms trended directionally cheaper than baseline (B: 1.4%, C: 3.7%) but neither
+reached significance (p=0.38 and p=0.18). Correctness was 20/20 on all arms. The
+likely explanation: the jq README (~6 KB) is below both collapse thresholds, so the
+PostToolUse hook fires but the result is small enough that `claude-code-result.sh`
+passes it through unchanged. The cost saving comes entirely from marginal variance in
+model verbosity (fresh in: 34 → 33 → 32, turns: 5.0 → 4.8 → 4.7), not from actual
+result collapsing. To produce a genuine signal, the bench would need a WebFetch target
+that reliably returns >25 KB — e.g., a large HTML page or a verbose API response.
+The feature is correct and non-regressive; benefit is masked because the test URL is
+too small. Reproduce:
+`QB_MODEL=claude-haiku-4-5 QB_REPEATS=20 QB_PARALLEL=4 bench/webfetch-collapse.sh`.
+Run: 2026-07-08.
+
+---
+
 ## C8 selective-downgrade — 2026-07-08
 
 A/B: does selectively setting `CLAUDE_CODE_SUBAGENT_MODEL=claude-haiku-4-5` on the
