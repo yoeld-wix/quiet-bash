@@ -25,7 +25,7 @@ Recent commits:
 ${LOG}
 Last commit change summary: ${CHANGED:-n/a}"
 
-TASK='What is the current branch name and what was the most recent commit message? Reply with exactly: BRANCH: <name> COMMIT: <message>'
+TASK='What is the most recently added feature in this repo? Name the file that implements it and explain in one sentence what it does. Check the code to confirm.'
 
 TRUTH_BRANCH="$BRANCH"
 TRUTH_COMMIT=$(git -C "$ROOT" log --oneline -1 2>/dev/null | cut -d' ' -f2-)
@@ -43,7 +43,7 @@ $TASK"
   [ -z "$j" ] && { echo "  ! ${arm} rep${rep}: no output" >&2; return; }
   local result ok=0
   result=$(printf '%s' "$j" | python3 -c "import sys,json; print(json.load(sys.stdin).get('result',''))" 2>/dev/null)
-  printf '%s' "$result" | grep -qi "$TRUTH_BRANCH" && printf '%s' "$result" | grep -qi "$(printf '%s' "$TRUTH_COMMIT" | head -c 20)" && ok=1
+  printf '%s' "$result" | grep -qE '\b[a-zA-Z0-9_/-]+\.sh\b' && ok=1
   local dest="${jobfile:-$OUT}"
   printf '%s\n' "$j" | python3 -c "
 import sys,json

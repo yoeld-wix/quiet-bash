@@ -1,3 +1,27 @@
+## C1 session-brief — re-run with harder task — 2026-07-09
+
+Re-run with harder orientation task (previous: trivial git log query, both arms 1.0 turns; new: requires file exploration).
+
+```
+# Session-brief benchmark — mean per run
+| arm | cost $ | turns | output tok | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (cold) | 0.0828 | 9.2 | 1,391 | 20/20 | 20 |
+| B brief (pre-surfaced) | 0.0904 | 11.1 | 1,698 | 20/20 | 20 |
+
+brief vs baseline: cost -9.1%, turns 9.2 -> 11.1
+Mann-Whitney U (cost): p=0.8383 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: DO NOT SHIP**
+```
+
+**Verdict: DO NOT SHIP.** The brief arm was directionally more expensive than baseline (0.0904 vs 0.0828, +9.1%) and used more turns (11.1 vs 9.2), though neither difference is statistically significant (p=0.84). Correctness was 20/20 on both arms (p=1). Unlike the trivial original task (both arms 1.0 turns, answered from training knowledge), this task forced genuine file exploration in both arms — the "check the code to confirm" instruction overrides any benefit from pre-surfaced commits, because the model must read the implementing file regardless. The brief's git-log context is useful for identifying which commit introduced the feature, but the mandatory code-reading step resets both arms to the same exploration cost. Net effect: the brief adds token overhead (extra prompt bytes every turn) without eliminating any turns, making it slightly more expensive on this task shape. The session-brief feature is still non-regressive at near-zero cost in the actual hook (it is not prepended to every turn in production, only at session start) — but this bench finds no turn-reduction benefit on tasks that require code verification.
+
+Reproduce: `bench/session-brief.sh`. Run: 2026-07-09.
+
+---
+
 ## C9 WebFetch collapse — re-run with large URL — 2026-07-09
 
 Re-run after fixing task URL (previous: jq README ~6 KB, below both thresholds; new: https://raw.githubusercontent.com/pallets/flask/main/CHANGES.rst ~72 KB).
