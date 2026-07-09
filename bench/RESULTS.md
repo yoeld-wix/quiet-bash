@@ -749,3 +749,25 @@ Haiku caches the system prompt aggressively — the 200-path find output lands i
 cache, so collapsing it saves no fresh tokens in this configuration. The wrapping
 is not harmful (correctness preserved, cost within noise), but this bench finds
 no positive signal. Reproduce: `bench/find-collapse.sh`.
+
+## C10 anti-preamble — re-run n=40 — 2026-07-09
+
+Re-run at n=40 to resolve INCONCLUSIVE from n=20 (−7.4% output tokens, p=0.39).
+
+```
+# Anti-preamble directive benchmark — mean per run
+| arm | cost $ | output tok | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no directive) | 0.0263 | 492 | 1.0 | 40/40 | 40 |
+| B anti-preamble (directive) | 0.0275 | 524 | 1.0 | 40/40 | 40 |
+
+anti-preamble vs baseline: output tok -6.4%, cost -4.7% (positive=fewer/cheaper)
+Mann-Whitney U (output tok): p=0.7662 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: DO NOT SHIP**
+```
+
+**Verdict: DO NOT SHIP.** At n=40 the directive arm produces more output tokens on average (524 vs 492, −6.4% in the wrong direction) with p=0.77 — far from significant. The n=20 direction (fewer tokens) does not replicate; doubling the sample size reverses the trend. Correctness is 40/40 on both arms.
+
+Reproduce: `QB_REPEATS=40 bench/anti-preamble.sh`. Run: 2026-07-09.
