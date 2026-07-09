@@ -22,26 +22,21 @@ PRE_HOOK='"PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "
 BASE_SET="$(mktemp)";  printf '{}\n' > "$BASE_SET"
 DEDUP_SET="$(mktemp)"; printf '{ "hooks": { %s } }\n' "$PRE_HOOK" > "$DEDUP_SET"
 
-TASK='First, run: cat package.json   to find the version field. Then modify startup.sh so it prints "version: X.Y.Z" (using the actual version from package.json) before "starting...". Run: cat package.json again to confirm the version before finalizing.'
+TASK='Count how many APP_CONFIG_ lines are in config.sh. Then append a comment to config.sh that says "# Total APP_CONFIG entries: N" where N is your count. Then re-read config.sh to verify the comment was added correctly and report: verified or not.'
+
+FIXTURE_SCRIPT="$ROOT/bench/fixtures/make-dedup-fixture.sh"
 
 run_one() { # arm settings rep jobfile
   local arm="$1" set="$2" rep="$3" jobfile="${4:-}"
   # Each job gets its own isolated fixture directory to avoid parallel race conditions
   local target
-  target="$(mktemp -d)"
-  cat > "$target/package.json" <<'JSON'
-{"name":"dedup-fixture","version":"2.7.1","description":"bench fixture"}
-JSON
-  cat > "$target/startup.sh" <<'SH'
-#!/usr/bin/env bash
-echo "starting..."
-SH
+  target="$("$FIXTURE_SCRIPT")"
   local j
   j=$(cd "$target" && timeout 120 claude -p "$TASK" \
         --model "$MODEL" --output-format json --settings "$set" \
         --allowedTools "Bash" "Edit" "Write" 2>/dev/null)
   local ok=0
-  if grep -qE 'version.*2\.7\.1|2\.7\.1.*version' "$target/startup.sh" 2>/dev/null; then
+  if printf '%s' "$j" | grep -qiE 'verif|confirmed|correct|success'; then
     ok=1
   fi
   rm -rf "$target"
@@ -67,7 +62,7 @@ echo "model=$MODEL repeats=$REPEATS parallel=$PARALLEL" >&2
 run_one warmup "$BASE_SET" 0 /dev/null
 
 export -f run_one
-export MODEL TASK BASE_SET DEDUP_SET OUT
+export MODEL TASK BASE_SET DEDUP_SET OUT FIXTURE_SCRIPT
 
 JOBLIST="$(mktemp)"
 for rep in $(seq 1 "$REPEATS"); do

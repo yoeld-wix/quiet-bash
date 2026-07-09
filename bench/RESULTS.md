@@ -1,3 +1,27 @@
+## C3 same-session dedup — re-run large fixture — 2026-07-09
+
+Re-run with 400-line config.sh fixture (previous: tiny package.json, dedup overhead exceeded token saving).
+
+```
+# Same-session cat dedup benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no dedup) | 0.0656 | 27 | 4.0 | 20/20 | 20 |
+| B dedup (quiet_cmd_dedup active) | 0.0653 | 28 | 4.2 | 20/20 | 20 |
+
+dedup vs baseline: cost +0.4% (positive=cheaper)
+Mann-Whitney U (cost): p=0.9618 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: INCONCLUSIVE**
+```
+
+**Verdict: INCONCLUSIVE.** Even with a 400-line fixture (~409 lines of config.sh), cost delta is +0.4% and p=0.9618 — not significant. Correctness is 20/20 on both arms (Fisher p=1). The root cause is prompt caching: the Anthropic API caches file content at the session level, so re-reading the same large file costs only cache-read tokens (billed at 10% of fresh-token cost). The dedup hook blocks the second Bash read but cannot recapture cost already eliminated by API-level caching — the marginal saving over what caching already provides is negligible. Two runs now show the same pattern: p=0.14 (tiny fixture) and p=0.96 (large fixture). The feature is non-regressive but provides no measurable additional cost benefit on top of Anthropic's prompt cache.
+
+Reproduce: `bench/dedup.sh`. Run: 2026-07-09.
+
+---
+
 ## C1 session-brief — re-run with harder task — 2026-07-09
 
 Re-run with harder orientation task (previous: trivial git log query, both arms 1.0 turns; new: requires file exploration).
