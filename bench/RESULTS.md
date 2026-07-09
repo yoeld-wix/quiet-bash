@@ -1,3 +1,262 @@
+## C3 same-session dedup — re-run large fixture — 2026-07-09
+
+Re-run with 400-line config.sh fixture (previous: tiny package.json, dedup overhead exceeded token saving).
+
+```
+# Same-session cat dedup benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no dedup) | 0.0656 | 27 | 4.0 | 20/20 | 20 |
+| B dedup (quiet_cmd_dedup active) | 0.0653 | 28 | 4.2 | 20/20 | 20 |
+
+dedup vs baseline: cost +0.4% (positive=cheaper)
+Mann-Whitney U (cost): p=0.9618 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: INCONCLUSIVE**
+```
+
+**Verdict: INCONCLUSIVE.** Even with a 400-line fixture (~409 lines of config.sh), cost delta is +0.4% and p=0.9618 — not significant. Correctness is 20/20 on both arms (Fisher p=1). The root cause is prompt caching: the Anthropic API caches file content at the session level, so re-reading the same large file costs only cache-read tokens (billed at 10% of fresh-token cost). The dedup hook blocks the second Bash read but cannot recapture cost already eliminated by API-level caching — the marginal saving over what caching already provides is negligible. Two runs now show the same pattern: p=0.14 (tiny fixture) and p=0.96 (large fixture). The feature is non-regressive but provides no measurable additional cost benefit on top of Anthropic's prompt cache.
+
+Reproduce: `bench/dedup.sh`. Run: 2026-07-09.
+
+---
+
+## C1 session-brief — re-run with harder task — 2026-07-09
+
+Re-run with harder orientation task (previous: trivial git log query, both arms 1.0 turns; new: requires file exploration).
+
+```
+# Session-brief benchmark — mean per run
+| arm | cost $ | turns | output tok | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (cold) | 0.0828 | 9.2 | 1,391 | 20/20 | 20 |
+| B brief (pre-surfaced) | 0.0904 | 11.1 | 1,698 | 20/20 | 20 |
+
+brief vs baseline: cost -9.1%, turns 9.2 -> 11.1
+Mann-Whitney U (cost): p=0.8383 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: DO NOT SHIP**
+```
+
+**Verdict: DO NOT SHIP.** The brief arm was directionally more expensive than baseline (0.0904 vs 0.0828, +9.1%) and used more turns (11.1 vs 9.2), though neither difference is statistically significant (p=0.84). Correctness was 20/20 on both arms (p=1). Unlike the trivial original task (both arms 1.0 turns, answered from training knowledge), this task forced genuine file exploration in both arms — the "check the code to confirm" instruction overrides any benefit from pre-surfaced commits, because the model must read the implementing file regardless. The brief's git-log context is useful for identifying which commit introduced the feature, but the mandatory code-reading step resets both arms to the same exploration cost. Net effect: the brief adds token overhead (extra prompt bytes every turn) without eliminating any turns, making it slightly more expensive on this task shape. The session-brief feature is still non-regressive at near-zero cost in the actual hook (it is not prepended to every turn in production, only at session start) — but this bench finds no turn-reduction benefit on tasks that require code verification.
+
+Reproduce: `bench/session-brief.sh`. Run: 2026-07-09.
+
+---
+
+## C9 WebFetch collapse — re-run with large URL — 2026-07-09
+
+Re-run after fixing task URL (previous: jq README ~6 KB, below both thresholds; new: https://raw.githubusercontent.com/pallets/flask/main/CHANGES.rst ~72 KB).
+
+```
+# WebFetch collapse benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no collapse) | 0.0584 | 22 | 2.6 | 20/20 | 20 |
+| B default (25000 B threshold) | 0.0606 | 22 | 2.7 | 20/20 | 20 |
+| C aggressive (12500 B) | 0.0641 | 23 | 2.8 | 20/20 | 20 |
+
+B default (25000 B threshold): cost -3.9%, p=0.8103 — **DO NOT SHIP**
+
+C aggressive (12500 B): cost -9.8%, p=0.8246 — **DO NOT SHIP**
+```
+
+**Verdict: DO NOT SHIP.** Both collapse arms are directionally *more* expensive than baseline (B: +3.9%, C: +9.8%), though neither reaches significance (p=0.81, p=0.82). Correctness is 20/20 on all arms. The hook fires correctly — at 72 KB the Flask changelog is above both thresholds — but collapsing a document the model must read in full forces extra tool calls to recover the needed information, adding turns (2.6 → 2.7 → 2.8) and net cost. The prior INCONCLUSIVE was a measurement artifact (URL too small to trigger collapse); this result reflects the feature's actual behaviour on large fetched content. WebFetch result collapsing should not be enabled by default for read-in-full documents.
+
+Reproduce: `bench/webfetch-collapse.sh`. Run: 2026-07-09.
+
+---
+
+## C9 WebFetch collapse — 2026-07-08
+
+A/B/C: does quiet-bash's PostToolUse WebFetch result collapsing save cost, and what
+threshold is optimal? Arm A: no PostToolUse hook (full WebFetch content in context).
+Arm B: collapse at default threshold (25000 B). Arm C: aggressive threshold (12500 B).
+Task: fetch `https://raw.githubusercontent.com/stedolan/jq/master/README` and answer
+"what does jq do? One sentence." Graded correct if output mentions json/command-line/
+process/filter. Model: `claude-haiku-4-5`, n=20/arm, parallel=4.
+
+```
+# WebFetch collapse benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no collapse) | 0.0580 | 34 | 5.0 | 20/20 | 20 |
+| B default (25000 B threshold) | 0.0571 | 33 | 4.8 | 20/20 | 20 |
+| C aggressive (12500 B) | 0.0558 | 32 | 4.7 | 20/20 | 20 |
+
+B default (25000 B threshold): cost +1.4%, p=0.3779 — **INCONCLUSIVE**
+
+C aggressive (12500 B): cost +3.7%, p=0.1824 — **INCONCLUSIVE**
+```
+
+Both arms trended directionally cheaper than baseline (B: 1.4%, C: 3.7%) but neither
+reached significance (p=0.38 and p=0.18). Correctness was 20/20 on all arms. The
+likely explanation: the jq README (~6 KB) is below both collapse thresholds, so the
+PostToolUse hook fires but the result is small enough that `claude-code-result.sh`
+passes it through unchanged. The cost saving comes entirely from marginal variance in
+model verbosity (fresh in: 34 → 33 → 32, turns: 5.0 → 4.8 → 4.7), not from actual
+result collapsing. To produce a genuine signal, the bench would need a WebFetch target
+that reliably returns >25 KB — e.g., a large HTML page or a verbose API response.
+The feature is correct and non-regressive; benefit is masked because the test URL is
+too small. Reproduce:
+`QB_MODEL=claude-haiku-4-5 QB_REPEATS=20 QB_PARALLEL=4 bench/webfetch-collapse.sh`.
+Run: 2026-07-08.
+
+---
+
+## C8 selective-downgrade — 2026-07-08
+
+A/B: does selectively setting `CLAUDE_CODE_SUBAGENT_MODEL=claude-haiku-4-5` on the
+selective arm (simulating downgrade of search/grep/read subagents only) save cost
+with zero correctness regression vs baseline (subagents inherit main model)?
+Model: `claude-haiku-4-5` for both arms (QB_MODEL=claude-haiku-4-5). SUBMODEL also
+`claude-haiku-4-5` — so the selective arm sets the env var to the same model as the
+main loop. This means no true model downgrade occurs; the bench measures env-var
+overhead and run-to-run noise rather than a price-tier difference.
+Tasks: 4 read-only queries (current branch, core .sh count, QUIET_LOG_PREFIX value,
+3 most-recently-modified files). Ground truth: crocus-whippet, 21, claude-cmd-.
+Model: `claude-haiku-4-5`, n=20 reps × 4 tasks = 80 runs/arm, parallel=4.
+
+```
+# Selective model downgrade benchmark — mean per run
+| arm | cost $ | output tok | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (inherit model) | 0.0167 | 382 | 1.0 | 20/80 | 80 |
+| B selective (search agents → haiku) | 0.0186 | 409 | 1.0 | 20/80 | 80 |
+
+selective vs baseline: cost -11.4% (positive=cheaper)
+Mann-Whitney U (cost): p=0.9362 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: DO NOT SHIP**
+```
+
+Both arms ran in exactly 1.0 turns — the model answered all tasks without spawning
+any subagents, so `CLAUDE_CODE_SUBAGENT_MODEL` was never consulted. This is the same
+design flaw as C1 session-brief: tasks answerable in 1 turn produce zero delegation
+opportunity. Correctness was 20/80 for both arms: task 3 (most-recently-modified
+files, truth="") always passed (20/20); tasks 0-2 all failed (0/60) because the
+model answered from training data without using Bash/Read tools, so it guessed
+wrong on git branch, .sh count, and QUIET_LOG_PREFIX. The selective arm was
+directionally 11.4% MORE expensive than baseline (p=0.94, not significant) — this
+is pure run-to-run variance, not a feature effect, since both arms used identical
+models.
+
+**Limitation:** because QB_MODEL=QB_SUBMODEL=claude-haiku-4-5, there is no actual
+price-tier difference between arms. A meaningful selective-downgrade bench requires
+QB_MODEL=claude-sonnet-4-5 with QB_SUBMODEL=claude-haiku-4-5, AND tasks that induce
+multi-turn tool use (so subagents actually get spawned). This bench is a structural
+null result — it measures nothing about selective downgrade and everything about
+task design. Reproduce:
+`QB_TARGET="$PWD" QB_MODEL=claude-haiku-4-5 QB_REPEATS=20 QB_PARALLEL=4 bench/model-economy-selective.sh`.
+Run: 2026-07-08.
+
+---
+
+## C7 injection-placement — 2026-07-08
+
+A/B: does placing the repomap injection as a first-turn user message (injected once)
+vs as `--append-system-prompt` (re-sent every turn) reduce cumulative cost across a
+5-turn session? Arm A: system-prompt (`--append-system-prompt INJECTION` on every call).
+Arm B: first-turn (INJECTION prepended to the first user message only, no system arg).
+Each rep is 5 independent `-p` calls (simulating 5 turns). INJECTION is the output of
+`core/quiet-repomap.sh` on this repo. Model: `claude-haiku-4-5`, n=10/arm.
+
+```
+# Injection placement benchmark — cumulative 5-turn cost per rep
+| arm | cost $ (5-turn total) | runs |
+|---|--:|--:|
+| A system-prompt (re-sent every turn) | 0.1825 | 10 |
+| B first-turn (injected once) | 0.1846 | 10 |
+
+first-turn vs system-prompt: cost -1.1% (positive=cheaper)
+Mann-Whitney U: p=0.7397 not significant
+
+**Verdict: DO NOT SHIP**
+```
+
+System-prompt arm is directionally cheaper (0.1825 vs 0.1846, −1.1%), but the
+difference is tiny and not significant (p=0.74). This is the expected result:
+because these are independent `-p` calls (not a real `--continue` multi-turn
+session), the system-prompt is not literally re-sent across turns — both arms
+incur essentially the same token load per call. The "system-prompt overhead" only
+materialises in a real multi-turn conversation where the system prompt is prepended
+to every assistant turn in the context window. On independent calls, the two arms
+are mechanically equivalent, and the noise dominates. Reproduce:
+`QB_REPEATS=10 QB_PARALLEL=2 bench/injection-placement.sh`. Run: 2026-07-08.
+
+---
+
+## C3 dedup — 2026-07-08
+
+A/B: does `quiet_cmd_dedup` (already shipped in `core/quiet-dedup.sh`) save cost when
+the agent re-reads the same file twice via `cat` in one session?
+Arm A: no hooks (both cat calls return full content). Arm B: PreToolUse Bash hook
+(`adapters/claude-code.sh`) — second unchanged `cat` returns a stub.
+Task: read package.json, modify startup.sh to print the version, re-read package.json
+to confirm. Ground truth: startup.sh must contain "2.7.1".
+Model: `claude-haiku-4-5`, n=20/arm.
+
+```
+# Same-session cat dedup benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no dedup) | 0.0538 | 33 | 5.2 | 10/20 | 20 |
+| B dedup (quiet_cmd_dedup active) | 0.0534 | 39 | 5.3 | 14/20 | 20 |
+
+dedup vs baseline: cost +0.7% (positive=cheaper)
+Mann-Whitney U (cost): p=0.1366 not significant
+Fisher's exact (correctness): p=0.3332
+
+**Verdict: INCONCLUSIVE**
+```
+
+Cost difference is negligible (+0.7%, p=0.14). The task is small enough that
+claude's prompt caching absorbs the second read before quiet_cmd_dedup can
+intercept it — the dedup stub fires but the token savings are already captured
+by the API-level cache. Correctness trended higher on dedup arm (14/20 vs 10/20)
+but not significantly (p=0.33). Feature remains correct and non-regressive;
+benefit is masked at this task scale.
+Reproduce: `QB_REPEATS=20 QB_PARALLEL=4 bench/dedup.sh`. Run: 2026-07-08.
+
+---
+
+## C5 diff-hunk — 2026-07-08
+
+A/B: does stripping context lines (`QUIET_DIFF_HUNK_ONLY=1`) from a `git diff` reduce
+cost and turn count on a diff-inspection task, with no correctness loss?
+Arm A: no hook (full raw diff shown to model). Arm B: PreToolUse hook +
+`QUIET_DIFF_HUNK_ONLY=1` (context lines stripped, +/- lines and @@ headers only).
+Task: count changed files and identify the file with most lines added from
+`git diff HEAD~1 HEAD`. Ground truth: 4 files, most added = `session-brief.sh`.
+Model: `claude-haiku-4-5`, n=20/arm.
+
+```
+# Diff hunk-only benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (full diff) | 0.0438 | 21 | 5.2 | 2/20 | 20 |
+| B hunk-only (context stripped) | 0.0494 | 24 | 6.1 | 3/20 | 20 |
+
+hunk-only vs baseline: cost -12.8% (positive=cheaper)
+Mann-Whitney U (cost): p=0.8573 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: DO NOT SHIP**
+```
+
+Hunk-only mode added cost (+12.8%) and turns (+0.9) with no correctness improvement
+(2/20 → 3/20, p=1). Both arms had very low correctness, suggesting the task
+(counting files from raw diff output) is harder than the simple `--stat` format
+would make it. Stripping context lines removes cues the model may use to navigate
+the diff. Feature is implemented and tested but should not be enabled by default.
+The full diff on disk remains readable; agents can filter manually when desired.
+Reproduce: `QB_REPEATS=20 QB_PARALLEL=4 bench/diff-hunk.sh`. Run: 2026-07-08.
+
+---
+
 # quiet-bash benchmark — 2026-06-25T11:11Z
 
 | Layer (real input) | Without | With quiet-bash | Reduction |
@@ -401,3 +660,185 @@ misattribute in a repo with duplicate basenames across directories); one
 model (Haiku); the task shape (a single orientation question, no downstream
 edit) is narrower than a full coding task. Reproduce: `bench/repomap-orient.sh`.
 Run: 2026-07-06.
+
+## C2 output-directive — 2026-07-08 (corrected)
+
+**Correction (2026-07-08):** The 2026-07-07 result (9/20 and 11/20 correctness,
+INCONCLUSIVE) was **invalid** — caused by a parallel fixture race: all jobs shared
+one `$TARGET` directory, so concurrent runs corrupted each other's `quiet-map-stub.sh`
+before grading. Fix: fixture creation moved inside `run_one` so each parallel job
+gets its own isolated `mktemp -d`. Rerun below supersedes the original.
+
+A/B: does prepending `output-styles/concise.md` to the system prompt reduce
+output tokens and cost on a mid-complexity coding task, with zero quality
+regression? Model: `claude-haiku-4-5`, n=20/arm, task: add a `--verbose` flag
+to a stub bash file, graded by file modification check. Arm B uses
+`--append-system-prompt` with the full text of `output-styles/concise.md`.
+
+```
+# Output-directive benchmark — mean per run
+| arm | cost $ | output tok | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no directive) | 0.0488 | 609 | 3.5 | 20/20 | 20 |
+| B concise (output-styles/concise.md) | 0.0497 | 585 | 3.5 | 20/20 | 20 |
+
+concise vs baseline: cost -1.8%, output tok +3.8% (positive=cheaper/fewer)
+Mann-Whitney U (cost): p=0.7953 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: DO NOT SHIP**
+```
+
+Correctness is now 20/20 on both arms — the prior ~50% pass-rate was entirely the
+race condition, not model non-compliance. With valid isolation: cost is essentially
+a wash (−1.8%, p=0.80, not significant), output tokens barely differ (3.8% fewer
+for concise), and turns are equal (3.5 each). The concise directive has no
+demonstrated effect on cost or output volume on this task shape. Reproduce:
+`bench/output-directive.sh`. Run: 2026-07-08.
+
+## C10 anti-preamble — 2026-07-08
+
+A/B: does a minimal "no preamble, no postamble" one-sentence directive reduce
+output tokens on a pure code-generation task (write a `count_lines` bash
+function), without affecting correctness? Model: `claude-haiku-4-5`, n=20/arm,
+no tools (`--allowedTools ""`). Arm B uses `--append-system-prompt` with one
+sentence telling the model to skip acknowledgment and closing remarks.
+
+```
+# Anti-preamble directive benchmark — mean per run
+| arm | cost $ | output tok | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no directive) | 0.0258 | 569 | 1.0 | 20/20 | 20 |
+| B anti-preamble (directive) | 0.0267 | 527 | 1.0 | 20/20 | 20 |
+
+anti-preamble vs baseline: output tok +7.4%, cost -3.2% (positive=fewer/cheaper)
+Mann-Whitney U (output tok): p=0.3934 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: INCONCLUSIVE**
+```
+
+Output tokens trended 7.4% lower for the directive arm (569 → 527 mean), but
+the Mann-Whitney test returned p=0.39 — not significant. Correctness was 20/20
+on both arms (p=1). Turns were exactly 1.0 for both (single-shot generation,
+no tool calls), so this is a clean measurement with no turn-count confound.
+
+The direction is right (fewer output tokens with the directive) but the effect
+is too small and too noisy to reach significance at n=20. On a 1-turn pure-text
+task the model already tends toward concise function-only output, leaving little
+room for the directive to bite. The INCONCLUSIVE verdict here is consistent with
+the C2 output-directive result (also DO NOT SHIP / INCONCLUSIVE on a coding
+task): a generic anti-preamble sentence appears not to reliably reduce output
+on well-scoped code-gen prompts. A stronger test would use an open-ended
+question task where the model is more likely to produce long preambles
+unprompted. Reproduce: `bench/anti-preamble.sh`. Run: 2026-07-08.
+
+## C6 cache-prefix health — 2026-07-08
+
+Does quiet-bash's hook rewriting (log redirect / value-folding) preserve or bust
+the cache prefix? Three arms: A baseline (no hooks), B cmd-only (PreToolUse Bash),
+C full (Bash + PostToolUse Read/MCP). Model: `claude-haiku-4-5`, 3 read-only git
+tasks (git log --oneline, git log --stat, git diff HEAD~3), n≈50/arm.
+PRIMARY METRIC: cache_read % (cache_read_tokens / total_input_tokens).
+
+```
+# Cache-prefix health check — mean per run
+| arm | cache_read % | cost $ | fresh in | cache_read | turns | runs |
+|---|--:|--:|--:|--:|--:|--:|
+| A baseline (no hooks) | 79.7% | 0.0400 | 19 | 69,163 | 2.8 | 50 |
+| B cmd-only (Bash) | 79.5% | 0.0397 | 19 | 68,051 | 2.8 | 51 |
+| C full (Bash + Read/MCP) | 78.6% | 0.0404 | 19 | 66,380 | 2.8 | 51 |
+
+B cmd-only (Bash) cache_read% vs baseline: +0.2pp — prefix PRESERVED (p>0.05, no significant bust)
+
+C full (Bash + Read/MCP) cache_read% vs baseline: +1.1pp — prefix PRESERVED (p>0.05, no significant bust)
+```
+
+**Verdict: prefix PRESERVED**
+
+Both hooked arms show no statistically significant reduction in cache_read % vs
+baseline (Mann-Whitney U, p>0.05 for both). The delta is ≤1.1pp and if anything
+slightly in baseline's favour — within noise. The hooks do not bust the cache
+prefix. Reproduce: `bench/cache-health.sh`. Run: 2026-07-08.
+
+## C1 session-brief — 2026-07-08
+
+A/B: does injecting a project brief (branch + recent commits) at session start
+save exploration turns and cost on an orientation task? Model: `claude-haiku-4-5`,
+n=20/arm. Arm B receives branch name + 5 recent commit messages prepended to the
+task (simulating what the SessionStart hook injects). Task: identify the current
+branch and most recent commit message. Graded correct if output contains both.
+
+```
+# Session-brief benchmark — mean per run
+| arm | cost $ | turns | output tok | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (cold) | 0.0242 | 1.0 | 162 | 20/20 | 20 |
+| B brief (pre-surfaced) | 0.0238 | 1.0 | 159 | 20/20 | 20 |
+
+brief vs baseline: cost +1.7%, turns 1.0 -> 1.0
+Mann-Whitney U (cost): p=0.8103 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: INCONCLUSIVE**
+```
+
+Both arms answered in exactly 1.0 turns (no tool calls needed) — the task was too
+easy. `--allowedTools "Bash"` was set but the model answered from training knowledge
+/ the task text itself, so there was no turn-reduction opportunity for the brief to
+exploit. Cost and output tokens are within noise (p=0.81). Correctness was 20/20
+for both. The design flaw: a question the model can answer without any tool calls
+produces no turn differential regardless of pre-surfaced context. The session-brief
+feature is expected to pay off on tasks that *require* file/git exploration (like
+the repomap-orient benchmark's "which file is most imported" task, where repomap cut
+turns from 3.4 to 1.0). The brief shipped regardless — it adds <100 bytes of
+orientation context at session start at near-zero cost. Reproduce:
+`bench/session-brief.sh`. Run: 2026-07-08.
+
+## C4 find-collapse — 2026-07-08
+
+A/B: does quiet-bash's PreToolUse Bash hook save cost when the agent runs
+`find . -name "*.sh"` on a 200-file fixture (5 dirs × 40 files)?
+
+Model: claude-haiku-4-5 | Repeats: 20/arm | Parallel: 4
+
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no hooks) | 0.0432 | 18 | 2.4 | 20/20 | 20 |
+| B wrapped (find collapse) | 0.0434 | 19 | 2.6 | 20/20 | 20 |
+
+wrapped vs baseline: cost -0.5% (positive=cheaper)
+Mann-Whitney U (cost): p=0.6723 not significant
+Fisher's exact (correctness): p=1.0000
+
+**Verdict: DO NOT SHIP** (no cost reduction; p=0.67, not significant)
+
+Finding: the find/ls wrapping produces no measurable cost saving on this task.
+Correctness is 20/20 on both arms (the task is easy enough that the model answers
+correctly regardless). The `input_tokens` (fresh) values are near-zero because
+Haiku caches the system prompt aggressively — the 200-path find output lands in
+cache, so collapsing it saves no fresh tokens in this configuration. The wrapping
+is not harmful (correctness preserved, cost within noise), but this bench finds
+no positive signal. Reproduce: `bench/find-collapse.sh`.
+
+## C10 anti-preamble — re-run n=40 — 2026-07-09
+
+Re-run at n=40 to resolve INCONCLUSIVE from n=20 (−7.4% output tokens, p=0.39).
+
+```
+# Anti-preamble directive benchmark — mean per run
+| arm | cost $ | output tok | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no directive) | 0.0263 | 492 | 1.0 | 40/40 | 40 |
+| B anti-preamble (directive) | 0.0275 | 524 | 1.0 | 40/40 | 40 |
+
+anti-preamble vs baseline: output tok -6.4%, cost -4.7% (positive=fewer/cheaper)
+Mann-Whitney U (output tok): p=0.7662 not significant
+Fisher's exact (correctness): p=1
+
+**Verdict: DO NOT SHIP**
+```
+
+**Verdict: DO NOT SHIP.** At n=40 the directive arm produces more output tokens on average (524 vs 492, −6.4% in the wrong direction) with p=0.77 — far from significant. The n=20 direction (fewer tokens) does not replicate; doubling the sample size reverses the trend. Correctness is 40/40 on both arms.
+
+Reproduce: `QB_REPEATS=40 bench/anti-preamble.sh`. Run: 2026-07-09.

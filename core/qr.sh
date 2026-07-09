@@ -38,6 +38,7 @@ generic)
 
 git)
   summary="${3:?usage: qr.sh git <cmd> <summary-cmd>}"
+  hunk_only="${4:-}"   # "--hunk-only" when QUIET_DIFF_HUNK_ONLY=1 (set by quiet_rewrite)
   log=$(mktemp "${QUIET_LOG_DIR}/${QUIET_LOG_PREFIX}XXXXXX")
   bash -c "$cmd" >"$log" 2>&1
   st=$?
@@ -46,7 +47,9 @@ git)
     echo "[git FAILED: exit ${st} — ${ln} lines in ${log} | last ${QUIET_FAIL_TAIL_LINES} below]"
     "$QUIET_CORE_DIR/quiet-tail.sh" "$log" "${QUIET_FAIL_TAIL_LINES}" 2>/dev/null || tail -n "${QUIET_FAIL_TAIL_LINES}" "$log"
   elif [ "$ln" -le "${QUIET_INLINE_LINE_LIMIT}" ]; then
-    cat "$log"
+    # hunk-only: strip context lines (^space) so LLM sees only +/- lines and @@ headers;
+    # full diff stays on disk at $log for follow-up reads.
+    if [ -n "$hunk_only" ]; then grep -v '^[[:space:]]' "$log"; else cat "$log"; fi
   else
     echo "[git output is ${ln} lines -> ${log} | summary below; locate: grep -n '<pattern>' ${log} | tally: quiet-agg.sh ${log} '<pattern>']"
     bash -c "$summary" 2>/dev/null | head -n 200
