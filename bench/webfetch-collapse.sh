@@ -6,8 +6,9 @@
 #   B current         — collapse at QUIET_RESULT_MIN_BYTES default (25000)
 #   C aggressive      — collapse at half the default (12500)
 #
-# Task: fetch the jq README from raw.githubusercontent.com and answer a question
-# about it — this is a controlled, reproducible WebFetch target.
+# Task: fetch the Flask CHANGES.rst from raw.githubusercontent.com (~73 KB) and
+# answer a question about it. This file is reliably >30 KB so both collapse
+# thresholds (25 KB default and 12.5 KB aggressive) actually fire.
 #
 # NOTE: This bench requires network access. Results are env-dependent (latency,
 # caching). Run from a consistent network environment.
@@ -29,8 +30,8 @@ BASE_SET="$(mktemp)";       printf '{}\n' > "$BASE_SET"
 DEFAULT_SET="$(mktemp)";    printf '{ "hooks": { %s } }\n' "$POST_HOOK_DEFAULT" > "$DEFAULT_SET"
 AGGR_SET="$(mktemp)";       printf '{ "hooks": { %s } }\n' "$POST_HOOK_DEFAULT" > "$AGGR_SET"
 
-# Task that requires WebFetch: the README of a small known repo
-TASK='Fetch https://raw.githubusercontent.com/stedolan/jq/master/README then tell me: what does jq do? One sentence.'
+# Task that requires WebFetch: the Flask changelog (~73 KB), large enough to trigger collapse
+TASK='Fetch https://raw.githubusercontent.com/pallets/flask/main/CHANGES.rst then tell me: what is the most recent Flask version mentioned at the top of that changelog? Reply with just the version number.'
 
 run_one() { # arm settings min_bytes rep [jobfile]
   local arm="$1" set="$2" min_bytes="$3" rep="$4" jobfile="${5:-}"
@@ -41,8 +42,8 @@ run_one() { # arm settings min_bytes rep [jobfile]
   [ -z "$j" ] && { echo "  ! ${arm} rep${rep}: no output" >&2; return; }
   local result ok=0
   result=$(printf '%s' "$j" | python3 -c "import sys,json; print(json.load(sys.stdin).get('result',''))" 2>/dev/null)
-  # pass if result mentions jq's core function (JSON processing)
-  printf '%s' "$result" | grep -qiE 'json|command.line|process|filter' && ok=1
+  # pass if result mentions a version number (e.g. 3.1.0 or 2.3.0)
+  printf '%s' "$result" | grep -qE '[0-9]+\.[0-9]+(\.[0-9]+)?' && ok=1
   local dest="${jobfile:-$OUT}"
   printf '%s\n' "$j" | python3 -c "
 import sys,json

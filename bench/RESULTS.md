@@ -1,3 +1,26 @@
+## C9 WebFetch collapse — re-run with large URL — 2026-07-09
+
+Re-run after fixing task URL (previous: jq README ~6 KB, below both thresholds; new: https://raw.githubusercontent.com/pallets/flask/main/CHANGES.rst ~72 KB).
+
+```
+# WebFetch collapse benchmark — mean per run
+| arm | cost $ | fresh in | turns | correct | runs |
+|---|--:|--:|--:|--:|--:|
+| A baseline (no collapse) | 0.0584 | 22 | 2.6 | 20/20 | 20 |
+| B default (25000 B threshold) | 0.0606 | 22 | 2.7 | 20/20 | 20 |
+| C aggressive (12500 B) | 0.0641 | 23 | 2.8 | 20/20 | 20 |
+
+B default (25000 B threshold): cost -3.9%, p=0.8103 — **DO NOT SHIP**
+
+C aggressive (12500 B): cost -9.8%, p=0.8246 — **DO NOT SHIP**
+```
+
+**Verdict: DO NOT SHIP.** Both collapse arms are directionally *more* expensive than baseline (B: +3.9%, C: +9.8%), though neither reaches significance (p=0.81, p=0.82). Correctness is 20/20 on all arms. The hook fires correctly — at 72 KB the Flask changelog is above both thresholds — but collapsing a document the model must read in full forces extra tool calls to recover the needed information, adding turns (2.6 → 2.7 → 2.8) and net cost. The prior INCONCLUSIVE was a measurement artifact (URL too small to trigger collapse); this result reflects the feature's actual behaviour on large fetched content. WebFetch result collapsing should not be enabled by default for read-in-full documents.
+
+Reproduce: `bench/webfetch-collapse.sh`. Run: 2026-07-09.
+
+---
+
 ## C9 WebFetch collapse — 2026-07-08
 
 A/B/C: does quiet-bash's PostToolUse WebFetch result collapsing save cost, and what
